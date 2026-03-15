@@ -25,7 +25,7 @@
 
 # nf-multicaller-exomecnv
 
-A Nextflow pipeline for comprehensive genomic analysis combining multiple variant callers with exome and copy number variation (CNV) detection. Based on a workflow by Dr **Phelelani T Mpangase**: https://github.com/phelelani/nf-exomecnv.
+A Nextflow pipeline for comprehensive genomic analysis combining multiple variant callers with exome and copy number variation (CNV) detection. Based on a workflow by **Dr Phelelani T Mpangase**: https://github.com/phelelani/nf-exomecnv.
 
 ## Overview
 

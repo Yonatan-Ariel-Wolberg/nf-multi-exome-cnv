@@ -278,7 +278,7 @@ process filterCLAMMSCNVs {
 // Process to convert CNV call results to VCF format
 process convertClammsToVcf {
     tag "BED_TO_VCF"
-    container 'docker://python:3.9-slim'
+    container 'docker://quay.io/biocontainers/python:3.14'
     publishDir "${outdir}/out_CLAMMS/vcfs", mode: 'copy', overwrite: true
 
     input:

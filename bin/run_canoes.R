@@ -40,7 +40,11 @@ target <- seq(1, nrow(canoes.reads))
 canoes.reads <- cbind(target, gc, canoes.reads)
 
 ## CALL CNVS IN THE SAMPLES
-source("/home/phelelani/nf-workflows/nf-exomecnv/bin/CANOES.R")
+# Locate CANOES.R in the same directory as this script
+args0 <- commandArgs(FALSE)
+script_path <- sub("--file=", "", args0[grep("--file=", args0)])
+script_dir  <- if (length(script_path) > 0) dirname(normalizePath(script_path)) else "."
+source(file.path(script_dir, "CANOES.R"))
 
 ## CREATE A VECTOR TO HOLD THE RESULTS FOR EACH SAMPLE
 xcnv.pass <- vector('list', length(sample.names))

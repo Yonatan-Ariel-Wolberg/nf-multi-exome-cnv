@@ -280,7 +280,7 @@ process genotypeCNVs {
 // SPLITS COMBINED VCF INTO INDIVIDUAL SAMPLE VCFs
 process splitVCF {
     tag { 'split_vcf' }
-    label 'vcf'
+    label 'xhmm'
     publishDir "${outdir}/out_XHMM", mode: 'copy', overwrite: true
     
     input:
@@ -310,12 +310,12 @@ process filterXHMMCNVs {
     path(individual_vcfs)
     
     output:
-    path("DATA_filtered.vcf"), emit: filtered_cnvs
+    path("*_filtered.vcf"), emit: filtered_cnvs
     
     script:
     """
     # Loop over the individual VCF files and apply bcftools filter
-    for vcf in individual_vcfs; do
+    for vcf in *.vcf; do
         bcftools filter -e 'FORMAT/EQ<=60 || FORMAT/SQ<=60 || FORMAT/NDQ<=60' \${vcf} -o \${vcf%.vcf}_filtered.vcf
     done
     """

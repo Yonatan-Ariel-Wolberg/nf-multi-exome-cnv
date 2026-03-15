@@ -12,7 +12,7 @@ process uploadCramFiles {
     tag "$sampleId"
     label 'icav2-dragen'
     maxForks params.maxUploadForks
-    cpus 0.5
+    cpus 1
     time '4h'
 
     errorStrategy { task.exitStatus == 100 ? 'terminate' : 'retry' }
@@ -142,7 +142,7 @@ process getStaticFiles {
     debug true
     tag "Validating Static Files"
     label 'icav2-dragen'
-    cpus 0.1
+    cpus 1
 
     input:
     path(dataFile)
@@ -177,7 +177,7 @@ process checkFileStatus {
     debug true
     tag "Checking Status"
     label 'icav2-dragen'
-    cpus 0.1
+    cpus 1
     errorStrategy 'retry'
     maxRetries 2
     
@@ -302,7 +302,7 @@ process startAnalysisBatch {
     debug true
     tag "Launch Batch Analysis"
     label 'icav2-dragen'
-    cpus 0.1
+    cpus 1
 
     input:
     path(dataFile)
@@ -395,7 +395,7 @@ process checkAnalysisStatus {
     debug true
     tag "Monitor Analysis"
     label 'icav2-dragen'
-    cpus 0.1
+    cpus 1
 
     input:
     path(dataFile)
@@ -448,7 +448,7 @@ process downloadAnalysisOutput {
     debug true
     tag "Download Output"
     label 'icav2-dragen'
-    cpus 0.5
+    cpus 1
 
     input:
     path(dataFile)
@@ -492,7 +492,7 @@ process deleteData {
     debug true
     tag "Cleanup"
     label 'icav2-dragen'
-    cpus 0.1
+    cpus 1
     errorStrategy 'ignore'
 
     input:

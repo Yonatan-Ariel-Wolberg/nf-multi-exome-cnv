@@ -6,11 +6,13 @@ nextflow.enable.dsl=2
 // ================================================================================
 
 // Define parameters for the workflow
-params {
-    ref     = file(params.ref, type: 'file')
-    probes  = file(params.probes, type: 'file')
-    outdir  = file(params.outdir, type: 'dir')
-}
+params.ref    = ''
+params.probes = ''
+params.outdir = 'results'
+
+ref    = file(params.ref, type: 'file')
+probes = file(params.probes, type: 'file')
+outdir = file(params.outdir, type: 'dir')
 
 // Define the list of chromosomes to process
 chromosomes = ["chr1", "chr2", "chr3", "chr4", "chr5", "chr6", "chr7", "chr8", "chr9", 
@@ -62,7 +64,7 @@ process genReadCounts {
     script:
     """
     ## CREATE A SORTED LIST OF BAM FILES FOR BEDTOOLS
-    sort bam_list_unsorted.txt > bam_list_sorted.txt
+    sort ${bam_list} > bam_list_sorted.txt
 
     ## SUBSET THE PROBES FOR A PARTICULAR CHROMOSOME
     grep ^"${chr}	" ${probes} > ${chr}_probes_sanger.bed
@@ -121,14 +123,15 @@ process filterCANOESCNVs {
     """
     grep --no-filename SAMPLE *_CNVs_pass.csv | uniq > Sample_CNVs.csv
     grep -v --no-filename SAMPLE *_CNVs_pass.csv | sort -k1,1 -k3g,3 >> Sample_CNVs.csv
-    awk '{ if( (\$10>=80) && (\$10!="NA") && (\$4>=100) ) { print } }' Sample_CNVs.csv > Sample_CNVs_filtered.csv
+    head -1 Sample_CNVs.csv > Sample_CNVs_filtered.csv
+    awk 'NR>1 && (\$10>=80) && (\$10!="NA") && (\$4>=100) { print }' Sample_CNVs.csv >> Sample_CNVs_filtered.csv
     """
 }
 
 // Process to convert the filtered CANOES output to VCF format
 process convertCanoesToVcf {
     tag { "CSV_TO_VCF" }
-    container 'docker://quay.io/biocontainers/python:3.14'
+    label 'canoes|R'
     publishDir "${outdir}/out_CANOES/vcfs", mode: 'copy', overwrite: true
 
     input:
@@ -150,22 +153,44 @@ process convertCanoesToVcf {
 }
 
 // Execute the pipeline
-workflow {
-    // Loop through each chromosome
-    for (chr in chromosomes) {
-        // Calculate GC content
-        calcGC_CANOES(chr)
+workflow CANOES {
+    take:
+    bam_list_ch   // path: file containing BAM file paths, one per line
+    fai_ch        // path: reference FASTA index (.fai)
 
-        // Generate read counts
-        genReadCounts(bam_list, chr)
+    main:
+    chr_ch = Channel.from(chromosomes)
 
-        // Run CANOES
-        runCANOES(chr, chr_reads_cov, chr_sample_list, chr_gc_content)
+    // Step 1: Calculate GC content per chromosome
+    calcGC_CANOES(chr_ch)
 
-        // Optionally filter CNVs
-        filterCANOESCNVs(chr)
-        
-        // Convert outputs to VCF
-        convertCanoesToVcf(filtered_csv, chr_sample_list, fai)
-    }
+    // Step 2: Generate per-chromosome read counts
+    genReadCounts(bam_list_ch, chr_ch)
+
+    // Step 3: Join read-counts and GC content by chromosome, then run CANOES
+    canoes_input_ch = genReadCounts.out.chr_reads_cov
+        .join(calcGC_CANOES.out.chr_gc_content, by: 0)
+
+    runCANOES(canoes_input_ch)
+
+    // Step 4: Collect all per-chromosome pass-CNV files and filter
+    all_cnvs_ch = runCANOES.out.chr_cnvs_pass
+        .map { chr, cnv_file -> cnv_file }
+        .collect()
+
+    filterCANOESCNVs(all_cnvs_ch)
+
+    // Step 5: Reuse sample list from the first genReadCounts output
+    sample_list_ch = genReadCounts.out.chr_reads_cov
+        .first()
+        .map { chr, reads, sample_list -> sample_list }
+
+    convertCanoesToVcf(
+        filterCANOESCNVs.out.filtered_cnvs,
+        sample_list_ch,
+        fai_ch
+    )
+
+    emit:
+    vcfs = convertCanoesToVcf.out.vcfs
 }

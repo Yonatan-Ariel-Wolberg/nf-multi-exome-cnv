@@ -279,7 +279,9 @@ process filterCLAMMSCNVs {
 // Process to convert CLAMMS BED to VCF using the Python script
 process convertClammsToVCF {
     tag "convert"
-    
+    label 'clamms|bedtools'
+    publishDir "${outdir}/out_CLAMMS/vcfs", mode: 'copy', overwrite: true
+
     input:
     path input_file
     path sample_file
@@ -287,11 +289,11 @@ process convertClammsToVCF {
     path log_file
 
     output:
-    path("${output_dir}/combined_CLAMMS_output.vcf"), emit: vcf_file
+    path("combined_CLAMMS_output.vcf"), emit: vcf_file
 
     script:
     """
-    python3 clamms_bed_to_vcf.py --input_file ${input_file} --sample_file ${sample_file} --output_dir ${output_dir} --fai_file ${fai_file} --log_file ${log_file}
+    python3 clamms_bed_to_vcf.py --input_file ${input_file} --sample_file ${sample_file} --output_dir . --fai_file ${fai_file} --log_file ${log_file} --combined
     echo "Conversion from BED to VCF completed"
     """
 }
@@ -299,27 +301,29 @@ process convertClammsToVCF {
 // Process to bgzip, sort, and index the produced VCF file
 process run_BCFtools {
     tag "bcftools"
-    
+    label 'clamms|bedtools'
+    publishDir "${outdir}/out_CLAMMS/vcfs", mode: 'copy', overwrite: true
+
     input:
     path vcf_file
-    path output_dir
 
     output:
-    path("${output_dir}/*.sorted.gz"), emit: sorted_vcf
+    path("*.sorted.vcf.gz"), emit: sorted_vcf
+    path("*.sorted.vcf.gz.tbi"), emit: sorted_vcf_index
 
     script:
+    def sorted_gz = "${vcf_file.simpleName}.sorted.vcf.gz"
     """
-    # bgzip
+    # bgzip the VCF
     bgzip -c ${vcf_file} > ${vcf_file}.gz
-    
-    # bcftools sort
-    bcftools sort ${vcf_file}.gz -o ${vcf_file}.sorted.gz
-    
-    # Use tabix to index the sorted VCF file
-    tabix -p vcf ${vcf_file}.sorted.gz
-    
-    # Optionally remove the intermediate files
+
+    # Sort the bgzipped VCF
+    bcftools sort ${vcf_file}.gz -o ${sorted_gz} -O z
+
+    # Index the sorted VCF
+    tabix -p vcf ${sorted_gz}
+
+    # Remove the intermediate unsorted gz
     rm ${vcf_file}.gz
-    rm ${vcf_file}
     """
 }

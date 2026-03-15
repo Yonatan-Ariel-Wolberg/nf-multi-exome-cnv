@@ -529,3 +529,41 @@ process deleteData {
     fi
     """
 }
+
+// =====================================================================================
+// SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
+// =====================================================================================
+
+workflow ICAV2_DRAGEN {
+    take:
+    cram_ch  // channel: tuple(sampleId, [cram_file, crai_file])
+
+    main:
+    // Step 1: Upload CRAM and CRAI files to ICA for each sample
+    uploadCramFiles(cram_ch)
+
+    // Step 2: Combine all per-sample upload data into a single file
+    combined_upload_ch = uploadCramFiles.out.dataFile
+        .collectFile(name: 'combined_data.txt')
+
+    // Step 3: Append static reference file IDs to the combined data file
+    getStaticFiles(combined_upload_ch)
+
+    // Step 4: Verify all uploaded files are available in ICA
+    checkFileStatus(getStaticFiles.out.dataFile)
+
+    // Step 5: Launch the DRAGEN batch analysis on ICA
+    startAnalysisBatch(checkFileStatus.out.dataFile)
+
+    // Step 6: Monitor the analysis until completion
+    checkAnalysisStatus(startAnalysisBatch.out.dataFile)
+
+    // Step 7: Download the analysis output from ICA
+    downloadAnalysisOutput(checkAnalysisStatus.out.dataFile)
+
+    // Step 8: Clean up temporary CRAM files and output folder from ICA
+    deleteData(downloadAnalysisOutput.out.dataFile)
+
+    emit:
+    result = downloadAnalysisOutput.out.dataFile
+}

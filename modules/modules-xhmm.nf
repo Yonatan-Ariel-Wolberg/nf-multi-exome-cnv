@@ -320,3 +320,73 @@ process filterXHMMCNVs {
     done
     """
 }
+
+// =====================================================================================
+// SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
+// =====================================================================================
+
+workflow XHMM {
+    take:
+    bam_list_ch  // path: file containing BAM file paths, one per line
+
+    main:
+    // Step 1: Group BAMs into batches for parallel depth-of-coverage calculation
+    groupBAMs(bam_list_ch)
+
+    bam_groups_ch = groupBAMs.out.bam_groups
+        .flatten()
+        .map { f -> tuple(f.simpleName, f) }
+
+    // Step 2: Calculate depth of coverage per BAM group
+    gatkDOC(bam_groups_ch)
+
+    // Step 3: Combine all group depth-of-coverage outputs
+    combineDOC(gatkDOC.out.bam_group_doc.map { group, file -> file }.collect())
+
+    // Step 4: Calculate per-target GC content and identify extreme GC targets
+    calcGC_XHMM()
+
+    // Step 5: Filter samples and targets, then mean-center the data
+    filterSamples(combineDOC.out.combined_doc, calcGC_XHMM.out.extreme_gc_targets)
+
+    // Step 6: Run PCA on mean-centered data
+    runPCA(filterSamples.out.filtered_centered)
+
+    // Step 7: Normalize mean-centered data using PCA information
+    normalisePCA(filterSamples.out.filtered_centered, runPCA.out.pca_data)
+
+    // Step 8: Filter and z-score center the PCA-normalized data
+    filterZScore(normalisePCA.out.data_pca_norm)
+
+    // Step 9: Filter original read-depth data to match the normalized filtered data
+    filterRD(
+        combineDOC.out.combined_doc,
+        filterSamples.out.excluded_filtered_targets,
+        filterZScore.out.excluded_zscore_targets,
+        filterSamples.out.excluded_filtered_samples,
+        filterZScore.out.excluded_zscore_samples
+    )
+
+    // Step 10: Discover CNVs in the normalized data
+    discoverCNVs(filterRD.out.orig_filtered, filterZScore.out.pca_norm_zscore)
+
+    // Step 11: Genotype discovered CNVs across all samples
+    genotypeCNVs(
+        filterRD.out.orig_filtered,
+        filterZScore.out.pca_norm_zscore,
+        discoverCNVs.out.cnvs
+    )
+
+    // Step 12: Split the combined VCF into per-sample VCFs
+    vcf_ch = genotypeCNVs.out.genotypes
+        .flatten()
+        .filter { it.name == 'DATA.vcf' }
+
+    splitVCF(vcf_ch)
+
+    // Step 13: Filter per-sample CNV calls by quality scores
+    filterXHMMCNVs(splitVCF.out.individual_vcfs)
+
+    emit:
+    filtered_cnvs = filterXHMMCNVs.out.filtered_cnvs
+}

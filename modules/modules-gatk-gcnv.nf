@@ -250,3 +250,83 @@ process POSTPROCESS_CALLS {
         --output-genotyped-segments ${sample_id}.genotyped_segments.vcf.gz
     """
 }
+
+// =====================================================================================
+// SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
+// =====================================================================================
+
+workflow GATK_GCNV {
+    take:
+    bam_ch      // channel: tuple(sample_id, reads, index)
+    fasta_ch    // path: reference FASTA
+    fai_ch      // path: FASTA index (.fai)
+    dict_ch     // path: sequence dictionary (.dict)
+    targets_ch  // path: target intervals BED/interval_list
+
+    main:
+    // Step 1: Generate ploidy priors from the reference index
+    GENERATE_PLOIDY_PRIORS(fai_ch)
+
+    // Step 2: Preprocess intervals with binning and padding
+    PREPROCESS_INTERVALS(fasta_ch, fai_ch, dict_ch, targets_ch)
+
+    // Step 3: Annotate intervals with GC content and mappability
+    ANNOTATE_INTERVALS(
+        PREPROCESS_INTERVALS.out.interval_list,
+        fasta_ch, fai_ch, dict_ch
+    )
+
+    // Step 4: Collect read counts per sample
+    COLLECT_READ_COUNTS(
+        bam_ch,
+        PREPROCESS_INTERVALS.out.interval_list,
+        fasta_ch, fai_ch, dict_ch
+    )
+
+    // Step 5: Filter intervals based on annotation and read count statistics
+    FILTER_INTERVALS(
+        PREPROCESS_INTERVALS.out.interval_list,
+        ANNOTATE_INTERVALS.out.annotated_intervals,
+        COLLECT_READ_COUNTS.out.counts.map { sample_id, hdf5 -> hdf5 }.collect()
+    )
+
+    // Step 6: Determine ploidy for the cohort
+    DETERMINE_PLOIDY_COHORT(
+        FILTER_INTERVALS.out.filtered_intervals,
+        COLLECT_READ_COUNTS.out.counts.map { sample_id, hdf5 -> hdf5 }.collect(),
+        GENERATE_PLOIDY_PRIORS.out.priors
+    )
+
+    // Step 7: Scatter filtered intervals into shards for parallel processing
+    SCATTER_INTERVALS(FILTER_INTERVALS.out.filtered_intervals)
+
+    shards_ch = SCATTER_INTERVALS.out.shards.flatten()
+
+    // Step 8: Run germline CNV caller in cohort mode for each interval shard
+    GERMLINE_CNV_CALLER_COHORT(
+        shards_ch,
+        ANNOTATE_INTERVALS.out.annotated_intervals,
+        COLLECT_READ_COUNTS.out.counts.map { sample_id, hdf5 -> hdf5 }.collect(),
+        DETERMINE_PLOIDY_COHORT.out.ploidy_calls
+    )
+
+    // Step 9: Post-process calls into per-sample genotyped VCFs
+    indexed_samples_ch = bam_ch
+        .map { sample_id, reads, index -> sample_id }
+        .toList()
+        .flatMap { samples ->
+            samples.withIndex().collect { sample, idx -> tuple(idx, sample) }
+        }
+
+    POSTPROCESS_CALLS(
+        indexed_samples_ch,
+        GERMLINE_CNV_CALLER_COHORT.out.model.collect(),
+        GERMLINE_CNV_CALLER_COHORT.out.calls.collect(),
+        DETERMINE_PLOIDY_COHORT.out.ploidy_calls,
+        dict_ch
+    )
+
+    emit:
+    final_vcf     = POSTPROCESS_CALLS.out.final_vcf
+    intervals_vcf = POSTPROCESS_CALLS.out.intervals_vcf
+}

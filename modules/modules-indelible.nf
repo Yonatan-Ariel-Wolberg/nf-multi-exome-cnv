@@ -177,3 +177,34 @@ process filterINDELIBLE {
     awk '{ if ((\$39 < 2) && (\$40 < 2)) { print } }' ${annotated} > ${sample}.annotated.filtered.tsv
     """
 }
+
+// =====================================================================================
+// SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
+// =====================================================================================
+
+workflow INDELIBLE {
+    take:
+    bam_ch  // channel: tuple(sample, bam, bai)
+
+    main:
+    // Step 1: Extract split/clipped reads from BAM files
+    run_Fetch(bam_ch)
+
+    // Step 2: Aggregate read information to a position-level view
+    run_Aggregate(run_Fetch.out.sc_reads)
+
+    // Step 3: Score positions based on read information and sequence context
+    run_Score(run_Aggregate.out.counts)
+
+    // Step 4: Generate the allele frequency and breakpoint database
+    run_Database(run_Score.out.database_in.collect())
+
+    // Step 5: Annotate positions with gene/exon information
+    run_Annotate(run_Database.out.indel_database, run_Score.out.scores)
+
+    // Step 6: Filter annotated results by confidence thresholds
+    filterINDELIBLE(run_Annotate.out.annotated)
+
+    emit:
+    filtered_cnvs = filterINDELIBLE.out.filtered_cnvs
+}

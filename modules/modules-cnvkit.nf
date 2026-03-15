@@ -145,3 +145,47 @@ process EXPORT_RESULTS {
     cnvkit.py export bed $cns -i $sample_id -o ${sample_id}_calls.bed
     """
 }
+
+// =====================================================================================
+// SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
+// =====================================================================================
+
+workflow CNVKIT {
+    take:
+    bam_ch              // channel: tuple(sample_id, bam, bai)
+    fasta_ch            // path: reference FASTA
+    targets_ch          // path: target BED file
+    refflat_ch          // path: refFlat annotation file
+    bam_for_autobin_ch  // path: single BAM file used for autobin bin size estimation
+
+    main:
+    // Step 1: Generate accessible regions from the reference genome
+    GENERATE_ACCESS(fasta_ch)
+
+    // Step 2: Auto-bin targets and antitargets
+    AUTOBIN(fasta_ch, targets_ch, GENERATE_ACCESS.out.access_bed, refflat_ch, bam_for_autobin_ch)
+
+    // Step 3: Calculate target and antitarget coverage per sample
+    COVERAGE(bam_ch, AUTOBIN.out.target_bed, AUTOBIN.out.antitarget_bed)
+
+    // Step 4: Create pooled reference from all sample coverages
+    all_covs_ch = COVERAGE.out.target_cov
+        .mix(COVERAGE.out.antitarget_cov)
+        .map { sample_id, cov -> cov }
+        .collect()
+
+    CREATE_POOLED_REFERENCE(fasta_ch, all_covs_ch)
+
+    // Step 5: Call CNVs per sample using the pooled reference
+    cnv_input_ch = COVERAGE.out.target_cov
+        .join(COVERAGE.out.antitarget_cov, by: 0)
+
+    CALL_CNV(cnv_input_ch, CREATE_POOLED_REFERENCE.out.ref_cnn)
+
+    // Step 6: Export CNV results as VCF and BED per sample
+    EXPORT_RESULTS(CALL_CNV.out.results)
+
+    emit:
+    vcf = EXPORT_RESULTS.out.vcf
+    bed = EXPORT_RESULTS.out.bed
+}

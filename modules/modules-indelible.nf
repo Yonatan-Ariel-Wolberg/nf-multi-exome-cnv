@@ -1,6 +1,10 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
+// =============================================================================
+// InDelible Module
+// =============================================================================
+
 // REQUIRED FILES
 ref               = file(params.ref, type: 'file')
 priors            = file(params.priors, type: 'file')

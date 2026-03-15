@@ -327,3 +327,82 @@ process run_BCFtools {
     rm ${vcf_file}.gz
     """
 }
+
+// =====================================================================================
+// SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
+// =====================================================================================
+
+workflow CLAMMS {
+    take:
+    bam_ch         // channel: tuple(sample_id, bam, bai)
+    fai_ch         // path: reference FASTA index (.fai)
+    sample_file_ch // path: sample file for VCF conversion
+    log_file_ch    // path: log file for VCF conversion
+
+    main:
+    // Step 1: Generate analysis windows
+    generateWindows()
+
+    // Step 2: Calculate depth of coverage per sample
+    samtoolsDOC(bam_ch, generateWindows.out.windows)
+
+    // Step 3: Normalize depth of coverage per sample
+    normalizeDOC(samtoolsDOC.out.coverage, generateWindows.out.windows)
+
+    // Step 4: Collect normalized coverages and create PCA data
+    createPCAData(normalizeDOC.out.norm_coverage.map { sample_id, norm_cov -> norm_cov }.collect())
+
+    // Step 5: Get Picard QC metrics per sample
+    getPicardQCMetrics(bam_ch)
+    getPicardMeanInsertSize(bam_ch)
+
+    // Step 6: Combine all Picard QC metrics
+    all_metrics_ch = getPicardQCMetrics.out.qc_metrics
+        .mix(getPicardMeanInsertSize.out.ins_size_metrics)
+        .map { sample_id, metrics -> metrics }
+        .collect()
+
+    combinePicardQCMetrics(all_metrics_ch)
+
+    // Step 7: Create custom reference panel using all normalized coverages
+    createCustomRefPanel(
+        normalizeDOC.out.norm_coverage.map { sample_id, norm_cov -> norm_cov }.collect(),
+        createPCAData.out.pca_data,
+        combinePicardQCMetrics.out.qcs_metrics
+    )
+
+    // Step 8: Train models per sample using its reference panel file
+    ref_panel_per_sample_ch = createCustomRefPanel.out.ref_panel
+        .flatten()
+        .map { file -> tuple(file.name.replace('.ref.panel.files', ''), file) }
+
+    trainModels(
+        ref_panel_per_sample_ch,
+        generateWindows.out.windows,
+        normalizeDOC.out.norm_coverage.map { sample_id, norm_cov -> norm_cov }.collect()
+    )
+
+    // Step 9: Call CNVs per sample by joining models with normalized coverage
+    call_cnv_input_ch = trainModels.out.sample_models
+        .join(normalizeDOC.out.norm_coverage, by: 0)
+
+    callCNVs(call_cnv_input_ch)
+
+    // Step 10: Collect all CNV calls and filter
+    filterCLAMMSCNVs(callCNVs.out.cnvs.map { sample_id, cnv_file -> cnv_file }.collect())
+
+    // Step 11: Convert filtered BED to VCF
+    convertClammsToVCF(
+        filterCLAMMSCNVs.out.filtered_cnvs,
+        sample_file_ch,
+        fai_ch,
+        log_file_ch
+    )
+
+    // Step 12: Sort, compress, and index the VCF
+    run_BCFtools(convertClammsToVCF.out.vcf_file)
+
+    emit:
+    sorted_vcf       = run_BCFtools.out.sorted_vcf
+    sorted_vcf_index = run_BCFtools.out.sorted_vcf_index
+}

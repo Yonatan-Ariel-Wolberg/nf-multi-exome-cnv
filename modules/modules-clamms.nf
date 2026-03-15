@@ -277,8 +277,8 @@ process filterCLAMMSCNVs {
 
 
 // Process to convert CLAMMS BED to VCF using the Python script
-process convertClammsToVCF {
-    tag "convert"
+process convertClammsToVcf {
+    tag "BED_TO_VCF"
     label 'clamms|bedtools'
     publishDir "${outdir}/out_CLAMMS/vcfs", mode: 'copy', overwrite: true
 
@@ -286,14 +286,13 @@ process convertClammsToVCF {
     path input_file
     path sample_file
     path fai_file
-    path log_file
 
     output:
-    path("combined_CLAMMS_output.vcf"), emit: vcf_file
+    path("*_CLAMMS_output.vcf"), emit: vcfs
 
     script:
     """
-    python3 clamms_bed_to_vcf.py --input_file ${input_file} --sample_file ${sample_file} --output_dir . --fai_file ${fai_file} --log_file ${log_file} --combined
+    python3 clamms_bed_to_vcf.py --input_file ${input_file} --sample_file ${sample_file} --output_dir . --fai_file ${fai_file}
     echo "Conversion from BED to VCF completed"
     """
 }
@@ -337,7 +336,6 @@ workflow CLAMMS {
     bam_ch         // channel: tuple(sample_id, bam, bai)
     fai_ch         // path: reference FASTA index (.fai)
     sample_file_ch // path: sample file for VCF conversion
-    log_file_ch    // path: log file for VCF conversion
 
     main:
     // Step 1: Generate analysis windows
@@ -392,15 +390,14 @@ workflow CLAMMS {
     filterCLAMMSCNVs(callCNVs.out.cnvs.map { sample_id, cnv_file -> cnv_file }.collect())
 
     // Step 11: Convert filtered BED to VCF
-    convertClammsToVCF(
+    convertClammsToVcf(
         filterCLAMMSCNVs.out.filtered_cnvs,
         sample_file_ch,
-        fai_ch,
-        log_file_ch
+        fai_ch
     )
 
     // Step 12: Sort, compress, and index the VCF
-    run_BCFtools(convertClammsToVCF.out.vcf_file)
+    run_BCFtools(convertClammsToVcf.out.vcfs)
 
     emit:
     sorted_vcf       = run_BCFtools.out.sorted_vcf

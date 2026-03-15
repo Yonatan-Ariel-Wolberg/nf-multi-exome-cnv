@@ -6,9 +6,9 @@ nextflow.enable.dsl=2
 // =====================================================================================
 include { run_Fetch; run_Aggregate; run_Score; run_Database; run_Annotate; run_DenovoTrio; run_DenovoMom; run_DenovoDad; filterINDELIBLE } from './modules/modules-indelible.nf'
 include { genReadCounts; calcGC_CANOES; runCANOES; filterCANOESCNVs; convertCanoesToVcf } from './modules/modules-canoes.nf'
-include { groupBAMs; gatkDOC; combineDOC; calcGC_XHMM; filterSamples; runPCA; normalisePCA; filterZScore; filterRD; discoverCNVs; genotypeCNVs; filterXHMMCNVs } from './modules/modules-xhmm.nf'
+include { groupBAMs; gatkDOC; combineDOC; calcGC_XHMM; filterSamples; runPCA; normalisePCA; filterZScore; filterRD; discoverCNVs; genotypeCNVs; splitVCF; filterXHMMCNVs } from './modules/modules-xhmm.nf'
 include { generateWindows; samtoolsDOC; normalizeDOC; createPCAData; getPicardQCMetrics; getPicardMeanInsertSize; combinePicardQCMetrics; createCustomRefPanel; trainModels; callCNVs; filterCLAMMSCNVs; convertClammsToVcf } from './modules/modules-clamms.nf'
-include { uploadCramFiles; getStaticFiles; checkFileStatus; startAnalysisBatch; checkAnalysisStatus; downloadAnalysisOutput; deleteData } from './modules/modules-dragen.nf'
+include { uploadCramFiles; getStaticFiles; checkFileStatus; startAnalysisBatch; checkAnalysisStatus; downloadAnalysisOutput; deleteData } from './modules/modules-icav2-dragen.nf'
 include { GENERATE_ACCESS; AUTOBIN; COVERAGE; CREATE_POOLED_REFERENCE; CALL_CNV; EXPORT_RESULTS } from './modules/modules-cnvkit.nf'
 include { GENERATE_PLOIDY_PRIORS; PREPROCESS_INTERVALS; ANNOTATE_INTERVALS; COLLECT_READ_COUNTS; FILTER_INTERVALS; DETERMINE_PLOIDY_COHORT; SCATTER_INTERVALS; GERMLINE_CNV_CALLER_COHORT; POSTPROCESS_CALLS } from './modules/modules-gcnv.nf'
 include { runSurvivorMerge } from './modules/modules-survivor.nf'
@@ -102,10 +102,11 @@ workflow RUN_XHMM {
         runPCA(filterSamples.out.filtered_centered)
         normalisePCA(filterSamples.out.filtered_centered, runPCA.out.pca_data)
         filterZScore(normalisePCA.out.data_pca_norm)
-        filterRD(combineDOC.out.combined_doc, filterSamples.out.excluded_filtered_targets, filterSamples.out.excluded_filtered_samples, filterZScore.out.excluded_zscore_targets, filterZScore.out.excluded_zscore_samples)
+        filterRD(combineDOC.out.combined_doc, filterSamples.out.excluded_filtered_targets, filterZScore.out.excluded_zscore_targets, filterSamples.out.excluded_filtered_samples, filterZScore.out.excluded_zscore_samples)
         discoverCNVs(filterRD.out.orig_filtered, filterZScore.out.pca_norm_zscore)
         genotypeCNVs(filterRD.out.orig_filtered, filterZScore.out.pca_norm_zscore, discoverCNVs.out.cnvs)
-        filterXHMMCNVs(discoverCNVs.out.cnvs.collect())
+        splitVCF(genotypeCNVs.out.genotypes.flatten().filter { it.name == 'DATA.vcf' })
+        filterXHMMCNVs(splitVCF.out.individual_vcfs)
 }
 
 workflow RUN_CLAMMS {

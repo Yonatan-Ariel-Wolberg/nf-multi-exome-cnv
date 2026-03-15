@@ -1,1 +1,9 @@
-{}
+{
+    "ref": "/path/to/reference.fasta",
+    "probes": "/path/to/probes.bed",
+    "outdir": "./results",
+    "interval_list": "/path/to/intervals.bed",
+    "mappability": "/path/to/mappability.bed",
+    "special_reg": "/path/to/special_regions.bed",
+    "sexinfo": "/path/to/sex_info.txt"
+}

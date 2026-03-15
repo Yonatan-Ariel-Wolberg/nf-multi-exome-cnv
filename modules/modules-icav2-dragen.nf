@@ -5,6 +5,8 @@ nextflow.enable.dsl=2
 // PROCESSES FOR ICAv2 DRAGEN GERMLINE ENRICHMENT
 // =====================================================================================
 
+// Inspired by a workflow by Reagan Cannell @ https://github.com/SBIMB/ica-elwazi/tree/main/nextflow_workflows/cram_input_dragen_ica_workflow
+
 process uploadCramFiles {
     debug true
     tag "$sampleId"

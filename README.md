@@ -10,7 +10,7 @@ XHMM:
 
 InDelible:
 
-ICAv2:
+ICAv2: https://help.ica.illumina.com/command-line-interface/cli-indexcommands
 
 DRAGEN Germline Enrichment: https://www.illumina.com/products/by-type/informatics-products/basespace-sequence-hub/apps/dragen-enrichment.html
 

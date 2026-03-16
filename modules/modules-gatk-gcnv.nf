@@ -254,7 +254,7 @@ process POSTPROCESS_CALLS {
 // Process to compress, sort, index, and annotate each gCNV VCF with TOOL=GATK-gCNV
 process BGZIP_SORT_INDEX_VCF {
     tag "${vcf_file.simpleName}"
-    label 'gatk'
+    label 'bcftools'
     publishDir "${outdir}/out_GCNV/vcfs", mode: 'copy', overwrite: true
 
     input:

@@ -300,7 +300,7 @@ process convertClammsToVcf {
 // Process to bgzip, sort, index, and annotate the produced VCF file with TOOL=CLAMMS
 process BGZIP_SORT_INDEX_VCF {
     tag "${vcf_file.simpleName}"
-    label 'clamms|bedtools'
+    label 'bcftools'
     publishDir "${outdir}/out_CLAMMS/vcfs", mode: 'copy', overwrite: true
 
     input:

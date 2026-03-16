@@ -155,7 +155,7 @@ process convertCanoesToVcf {
 // Process to compress, sort, index, and annotate each CANOES VCF with TOOL=CANOES
 process BGZIP_SORT_INDEX_VCF {
     tag "${vcf_file.simpleName}"
-    label 'canoes|R'
+    label 'bcftools'
     publishDir "${outdir}/out_CANOES/vcfs", mode: 'copy', overwrite: true
 
     input:

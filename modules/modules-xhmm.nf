@@ -280,7 +280,7 @@ process genotypeCNVs {
 // SPLITS COMBINED VCF INTO INDIVIDUAL SAMPLE VCFs
 process splitVCF {
     tag { 'split_vcf' }
-    label 'xhmm'
+    label 'bcftools'
     publishDir "${outdir}/out_XHMM", mode: 'copy', overwrite: true
     
     input:
@@ -303,7 +303,7 @@ process splitVCF {
 // FILTERS CNV OUTPUTS USING BCFTOOLS BASED ON EQ, SQ, AND NDQ VALUES
 process filterXHMMCNVs {
     tag { 'filter_cnvs' }
-    label 'xhmm'
+    label 'bcftools'
     publishDir "${outdir}/out_XHMM", mode: 'copy', overwrite: true
     
     input:
@@ -324,7 +324,7 @@ process filterXHMMCNVs {
 // Process to compress, sort, index, and annotate each XHMM VCF with TOOL=XHMM
 process BGZIP_SORT_INDEX_VCF {
     tag "${vcf_file.simpleName}"
-    label 'xhmm'
+    label 'bcftools'
     publishDir "${outdir}/out_XHMM/vcfs", mode: 'copy', overwrite: true
 
     input:

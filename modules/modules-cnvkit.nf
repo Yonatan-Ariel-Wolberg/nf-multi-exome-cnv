@@ -149,7 +149,7 @@ process EXPORT_RESULTS {
 // Process to compress, sort, index, and annotate each CNVkit VCF with TOOL=CNVkit
 process BGZIP_SORT_INDEX_VCF {
     tag "${vcf_file.simpleName}"
-    label 'cnvkit'
+    label 'bcftools'
     publishDir "${outdir}/out_CNVKIT/vcfs", mode: 'copy', overwrite: true
 
     input:

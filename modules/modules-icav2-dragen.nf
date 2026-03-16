@@ -533,7 +533,7 @@ process deleteData {
 process addDragenToolAnnotation {
     debug true
     tag "Add TOOLS=DRAGEN annotation"
-    label 'icav2-dragen'
+    label 'bcftools'
     publishDir "${params.localDownloadPath}", mode: 'copy', overwrite: true
     cpus 1
 

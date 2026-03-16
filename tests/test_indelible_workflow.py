@@ -21,38 +21,67 @@ sys.path.insert(0, os.path.abspath(BIN_DIR))
 
 # ---------------------------------------------------------------------------
 # Full annotated TSV column layout (40 columns, matching indelible.py annotate)
-# Columns 39 and 40 (1-based awk) are AF_freq and BP_freq, used by
-# FILTER_INDELIBLE:  awk '{ if (($39 < 2) && ($40 < 2)) { print } }'
+# The first 37 columns follow the actual INDELIBLE output format; the last 3
+# are added by 'indelible.py database' + 'indelible.py annotate'.
+#
+# FILTER_INDELIBLE awk command:
+#   awk '{ if (($39 < 2) && ($40 < 2)) { print } }' annotated > filtered.tsv
 #   $39 (1-based) = 0-based index 38 = AF_freq
 #   $40 (1-based) = 0-based index 39 = BP_freq
+#
+# Column order (1-based):
+#   1  chrom                 20 seq_longest           38 n_samples
+#   2  position              21 predicted             39 AF_freq
+#   3  coverage              22 prob_N                40 BP_freq
+#   4  insertion_context     23 prob_Y
+#   5  deletion_context      24 ddg2p
+#   6  sr_total              25 hgnc
+#   7  sr_total_long         26 hgnc_constrained
+#   8  sr_total_short        27 exonic
+#   9  sr_long_5             28 transcripts
+#  10  sr_short_5            29 exon_numbers
+#  11  sr_long_3             30 maf
+#  12  sr_short_3            31 blast_hit
+#  13  sr_entropy            32 blast_strand
+#  14  context_entropy       33 blast_identity
+#  15  entropy_upstream      34 blast_dist
+#  16  entropy_downstream    35 blast_hgnc
+#  17  sr_sw_similarity      36 blast_hgnc_constrained
+#  18  avg_avg_sr_qual       37 blast_ddg2p
+#  19  avg_mapq
 # ---------------------------------------------------------------------------
 _ANNOTATED_HEADER = (
-    "chrom\tposition\tcoverage\tsr_total\tseq_longest\tpredicted\tprob_Y\t"
-    "prob_N\tinsertion_context\tdeletion_context\tsr_total_long\tsr_total_short\t"
-    "sr_long_5\tsr_short_5\tsr_long_3\tsr_short_3\tsr_entropy\tcontext_entropy\t"
-    "entropy_upstream\tentropy_downstream\tsr_sw_similarity\tavg_avg_sr_qual\t"
-    "avg_mapq\tddg2p\thgnc\thgnc_constrained\texonic\ttranscripts\texon_numbers\t"
-    "maf\tblast_hit\tblast_strand\tblast_identity\tblast_dist\tblast_hgnc\t"
-    "blast_hgnc_constrained\tblast_ddg2p\tn_samples\tAF_freq\tBP_freq"
+    "chrom\tposition\tcoverage\tinsertion_context\tdeletion_context\t"
+    "sr_total\tsr_total_long\tsr_total_short\tsr_long_5\tsr_short_5\t"
+    "sr_long_3\tsr_short_3\tsr_entropy\tcontext_entropy\t"
+    "entropy_upstream\tentropy_downstream\tsr_sw_similarity\t"
+    "avg_avg_sr_qual\tavg_mapq\tseq_longest\tpredicted\tprob_N\tprob_Y\t"
+    "ddg2p\thgnc\thgnc_constrained\texonic\ttranscripts\texon_numbers\t"
+    "maf\tblast_hit\tblast_strand\tblast_identity\tblast_dist\t"
+    "blast_hgnc\tblast_hgnc_constrained\tblast_ddg2p\t"
+    "n_samples\tAF_freq\tBP_freq"
 )
 
 
-def _make_annotated_row(chrom, position, predicted, prob_y, af_freq, bp_freq,
-                        hgnc="GENE1", exonic="YES"):
+def _make_annotated_row(chrom, position, predicted, prob_Y, af_freq, bp_freq,
+                        hgnc="GENE1", exonic="False"):
     """Return a 40-column annotated TSV row (tab-separated string).
 
-    Column layout (1-based):
-      1-7:  chrom, position, coverage, sr_total, seq_longest, predicted, prob_Y
-      8-37: scoring / annotation fields (prob_N … blast_ddg2p)
-      38:   n_samples  (number of database samples carrying this variant)
-      39:   AF_freq    (allele frequency in database; awk $39)
-      40:   BP_freq    (breakpoint frequency in database; awk $40)
+    Columns follow the actual INDELIBLE output format (37 base columns) plus
+    the 3 database-derived columns appended by 'indelible.py annotate':
+      38: n_samples  (number of database samples carrying this variant)
+      39: AF_freq    (allele frequency in database; awk $39)
+      40: BP_freq    (breakpoint frequency in database; awk $40)
     """
+    prob_N = round(1.0 - float(prob_Y), 6)
     return (
-        f"{chrom}\t{position}\t50\t10\tACGT\t{predicted}\t{prob_y}\t"
-        f"0.05\tNA\tNA\t5\t5\t3\t3\t2\t2\t1.2\t0.8\t1.1\t0.9\t0.95\t35.0\t"
-        f"60.0\tNA\t{hgnc}\tNA\t{exonic}\tENST001\t3\t0.01\tNA\tNA\tNA\tNA\tNA\t"
-        f"NA\tNA\t5\t{af_freq}\t{bp_freq}"
+        f"{chrom}\t{position}\t50\t0\t0\t"
+        f"10\t7\t3\t4\t2\t3\t1\t"
+        f"1.5\t1.2\t1.3\t1.1\t1.0\t35.0\t29.0\t"
+        f"ACGT\t{predicted}\t{prob_N}\t{prob_Y}\t"
+        f"NA\t{hgnc}\tNA\t{exonic}\tENST001\t3\t0.01\t"
+        f"NA\tNA\tNA\tNA\tNA\tNA\tNA\t"
+        f"5\t{af_freq}\t{bp_freq}"
     )
 
 
@@ -246,7 +275,7 @@ class TestFullAnnotatedTsvToVcf:
         _, data = _read_vcf_records(os.path.join(out, "SAMPLE1_INDELIBLE_output.vcf"))
         assert data, "No VCF data records"
         first_info = data[0].split('\t')[7]
-        assert "EXONIC=YES" in first_info, f"EXONIC=YES not found in INFO: {first_info}"
+        assert "EXONIC=False" in first_info, f"EXONIC=False not found in INFO: {first_info}"
 
 
 # ===========================================================================

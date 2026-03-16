@@ -297,13 +297,44 @@ class TestCLAMMSBEDtoVCF:
 
 @pytest.fixture()
 def indelible_tsv(tmp_path):
-    """Minimal INDELIBLE TSV with one PASS and one LowQuality call."""
+    """Minimal INDELIBLE annotated TSV with one PASS and one LowQuality call.
+
+    Uses the actual 37-column INDELIBLE output format produced by
+    'indelible.py annotate':
+      chrom, position, coverage, insertion_context, deletion_context,
+      sr_total, sr_total_long, sr_total_short, sr_long_5, sr_short_5,
+      sr_long_3, sr_short_3, sr_entropy, context_entropy,
+      entropy_upstream, entropy_downstream, sr_sw_similarity,
+      avg_avg_sr_qual, avg_mapq, seq_longest, predicted, prob_N, prob_Y,
+      ddg2p, hgnc, hgnc_constrained, exonic, transcripts, exon_numbers,
+      maf, blast_hit, blast_strand, blast_identity, blast_dist,
+      blast_hgnc, blast_hgnc_constrained, blast_ddg2p
+    """
     tsv = tmp_path / "indelible.tsv"
-    tsv.write_text(
-        "chrom\tposition\tcoverage\tsr_total\tseq_longest\tpredicted\tprob_Y\n"
-        "chr1\t1000\t50\t15\tACGTACGT\tY\t0.95\n"
-        "chr2\t5000\t30\t8\tTTGC\tN\t0.30\n"
+    header = (
+        "chrom\tposition\tcoverage\tinsertion_context\tdeletion_context\t"
+        "sr_total\tsr_total_long\tsr_total_short\tsr_long_5\tsr_short_5\t"
+        "sr_long_3\tsr_short_3\tsr_entropy\tcontext_entropy\t"
+        "entropy_upstream\tentropy_downstream\tsr_sw_similarity\t"
+        "avg_avg_sr_qual\tavg_mapq\tseq_longest\tpredicted\tprob_N\tprob_Y\t"
+        "ddg2p\thgnc\thgnc_constrained\texonic\ttranscripts\texon_numbers\t"
+        "maf\tblast_hit\tblast_strand\tblast_identity\tblast_dist\t"
+        "blast_hgnc\tblast_hgnc_constrained\tblast_ddg2p"
     )
+    # Row 1: predicted=Y → PASS; Row 2: predicted=N → LowQuality
+    row1 = (
+        "chr1\t1000\t50\t0\t0\t15\t10\t5\t6\t3\t4\t2\t"
+        "1.5\t1.2\t1.3\t1.1\t1.0\t35.0\t29.0\t"
+        "ACGTACGT\tY\t0.05\t0.95\t"
+        "GENE1\tGENE1\t\tFalse\t\t\t\tNA\tNA\tNA\tNA\tNA\tNA\tNA"
+    )
+    row2 = (
+        "chr2\t5000\t30\t0\t0\t8\t6\t2\t3\t1\t3\t1\t"
+        "1.7\t1.6\t1.7\t1.5\t1.0\t32.8\t29.0\t"
+        "TTGC\tN\t0.70\t0.30\t"
+        "NA\tNA\t\tFalse\t\t\t\tNA\tNA\tNA\tNA\tNA\tNA\tNA"
+    )
+    tsv.write_text(header + "\n" + row1 + "\n" + row2 + "\n")
     return str(tsv)
 
 

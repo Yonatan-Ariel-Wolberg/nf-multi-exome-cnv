@@ -57,7 +57,7 @@ process runSurvivorMerge {
 // SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
 // =====================================================================================
 
-workflow runSurvivor {
+workflow SURVIVOR {
     take:
         grouped_vcfs
 

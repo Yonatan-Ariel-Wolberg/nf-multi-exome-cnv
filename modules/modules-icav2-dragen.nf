@@ -585,7 +585,7 @@ process addDragenToolAnnotation {
 // SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
 // =====================================================================================
 
-workflow ICAV2_DRAGEN {
+workflow DRAGEN {
     take:
     cram_ch  // channel: tuple(sampleId, [cram_file, crai_file])
 

@@ -101,7 +101,7 @@ process collapseVCFs {
 // SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
 // =====================================================================================
 
-workflow runTruvariCollapse {
+workflow TRUVARI {
     take:
         grouped_vcfs
 

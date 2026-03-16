@@ -1,4 +1,5 @@
 {
+    "workflow": "indelible",
     "ref": "/path/to/reference.fasta",
     "priors": "/path/to/priors.txt",
     "indelible_conf": "/path/to/indelible_config.json",

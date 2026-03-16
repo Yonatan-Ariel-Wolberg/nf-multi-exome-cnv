@@ -10,7 +10,7 @@ include { XHMM } from './modules/modules-xhmm.nf'
 include { CLAMMS } from './modules/modules-clamms.nf'
 include { uploadCramFiles; getStaticFiles; checkFileStatus; startAnalysisBatch; checkAnalysisStatus; downloadAnalysisOutput; deleteData; addDragenToolAnnotation } from './modules/modules-icav2-dragen.nf'
 include { CNVKIT } from './modules/modules-cnvkit.nf'
-include { GENERATE_PLOIDY_PRIORS; PREPROCESS_INTERVALS; ANNOTATE_INTERVALS; COLLECT_READ_COUNTS; FILTER_INTERVALS; DETERMINE_PLOIDY_COHORT; SCATTER_INTERVALS; GERMLINE_CNV_CALLER_COHORT; POSTPROCESS_CALLS } from './modules/modules-gcnv.nf'
+include { GATK_GCNV } from './modules/modules-gatk-gcnv.nf'
 include { runSurvivorMerge } from './modules/modules-survivor.nf'
 include { runTruvariCollapse } from './modules/modules-truvari.nf'
 
@@ -129,27 +129,7 @@ workflow RUN_GCNV {
         dict
         targets
     main:
-        GENERATE_PLOIDY_PRIORS(fai)
-        PREPROCESS_INTERVALS(fasta, fai, dict, targets)
-        COLLECT_READ_COUNTS(bams, PREPROCESS_INTERVALS.out.interval_list, fasta, fai, dict)
-        ANNOTATE_INTERVALS(PREPROCESS_INTERVALS.out.interval_list, fasta, fai, dict)
-        
-        ch_all_counts = COLLECT_READ_COUNTS.out.counts.map { it[1] }.collect()
-        
-        FILTER_INTERVALS(PREPROCESS_INTERVALS.out.interval_list, ANNOTATE_INTERVALS.out.annotated_intervals, ch_all_counts)
-        DETERMINE_PLOIDY_COHORT(FILTER_INTERVALS.out.filtered_intervals, ch_all_counts, GENERATE_PLOIDY_PRIORS.out.priors)
-        SCATTER_INTERVALS(FILTER_INTERVALS.out.filtered_intervals)
-        
-        ch_scatters = SCATTER_INTERVALS.out.shards.flatten()
-        GERMLINE_CNV_CALLER_COHORT(ch_scatters, ANNOTATE_INTERVALS.out.annotated_intervals, ch_all_counts, DETERMINE_PLOIDY_COHORT.out.ploidy_calls)
-        
-        ch_ploidy_calls = DETERMINE_PLOIDY_COHORT.out.ploidy_calls
-        ch_model_shards = GERMLINE_CNV_CALLER_COHORT.out.model.collect()
-        ch_call_shards = GERMLINE_CNV_CALLER_COHORT.out.calls.collect()
-        
-        ch_sample_metadata = COLLECT_READ_COUNTS.out.counts.toSortedList({ a, b -> a[0] <=> b[0] }).flatten().map { it -> it[0] }.indexed()
-
-        POSTPROCESS_CALLS(ch_sample_metadata, ch_model_shards, ch_call_shards, ch_ploidy_calls, dict)
+        GATK_GCNV(bams, fasta, fai, dict, targets)
 }
 
 workflow RUN_SURVIVOR {

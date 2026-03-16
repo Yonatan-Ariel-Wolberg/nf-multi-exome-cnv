@@ -251,6 +251,55 @@ process POSTPROCESS_CALLS {
     """
 }
 
+// Process to compress, sort, index, and annotate each gCNV VCF with TOOL=GATK-gCNV
+process BGZIP_SORT_INDEX_VCF {
+    tag "${vcf_file.simpleName}"
+    label 'gatk'
+    publishDir "${outdir}/out_GCNV/vcfs", mode: 'copy', overwrite: true
+
+    input:
+    path vcf_file
+
+    output:
+    path("*.sorted.vcf.gz"),     emit: sorted_vcf
+    path("*.sorted.vcf.gz.tbi"), emit: sorted_vcf_index
+
+    script:
+    def sample_name = vcf_file.name.replaceAll(/\.vcf(\.gz)?$/, '')
+    def sorted_gz   = "${sample_name}.sorted.vcf.gz"
+    """
+    # Create extra header line for the TOOL INFO field
+    printf '##INFO=<ID=TOOL,Number=1,Type=String,Description="Calling tool">\\n' > extra_header.txt
+
+    # Build a BED annotation file with TOOL=GATK-gCNV for every variant
+    bcftools query -f '%CHROM\\t%POS0\\t%END\\n' ${vcf_file} | \\
+        awk 'BEGIN{OFS="\\t"} {print \$1, \$2, \$3, "GATK-gCNV"}' | \\
+        bgzip -c > ${sample_name}_tool_annot.bed.gz
+    tabix -p bed ${sample_name}_tool_annot.bed.gz
+
+    # Annotate the VCF with TOOL=GATK-gCNV in the INFO field
+    bcftools annotate \\
+        -a ${sample_name}_tool_annot.bed.gz \\
+        -c CHROM,FROM,TO,INFO/TOOL \\
+        -h extra_header.txt \\
+        ${vcf_file} \\
+        -O v -o ${sample_name}_annotated.vcf
+
+    # Compress the annotated VCF with bgzip
+    bgzip -c ${sample_name}_annotated.vcf > ${sample_name}_annotated.vcf.gz
+
+    # Sort the compressed VCF
+    bcftools sort ${sample_name}_annotated.vcf.gz -o ${sorted_gz} -O z
+
+    # Index the sorted VCF
+    tabix -p vcf ${sorted_gz}
+
+    # Remove intermediate files
+    rm -f ${sample_name}_tool_annot.bed.gz ${sample_name}_tool_annot.bed.gz.tbi \\
+          ${sample_name}_annotated.vcf ${sample_name}_annotated.vcf.gz
+    """
+}
+
 // =====================================================================================
 // SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
 // =====================================================================================
@@ -326,7 +375,11 @@ workflow GATK_GCNV {
         dict_ch
     )
 
+    // Step 10: Compress, sort, index, and annotate each segments VCF with TOOL=GATK-gCNV
+    BGZIP_SORT_INDEX_VCF(POSTPROCESS_CALLS.out.final_vcf)
+
     emit:
-    final_vcf     = POSTPROCESS_CALLS.out.final_vcf
-    intervals_vcf = POSTPROCESS_CALLS.out.intervals_vcf
+    sorted_vcf       = BGZIP_SORT_INDEX_VCF.out.sorted_vcf
+    sorted_vcf_index = BGZIP_SORT_INDEX_VCF.out.sorted_vcf_index
+    intervals_vcf    = POSTPROCESS_CALLS.out.intervals_vcf
 }

@@ -61,3 +61,9 @@ Built with Nextflow for reproducible, scalable, and portable data analysis.
 ```bash
 git clone https://github.com/Yonatan-Ariel-Wolberg/nf-multicaller-exomecnv.git
 cd nf-multicaller-exomecnv
+```
+
+## Building the icav2_cli_v2.43.0.sif
+```bash
+apptainer build icav2_cli_v2.43.0.sif icav2.def
+```

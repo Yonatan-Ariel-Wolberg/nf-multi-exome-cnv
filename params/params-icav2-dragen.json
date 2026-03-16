@@ -1,4 +1,5 @@
 {
+    "workflow":                     "dragen",
     "projectId":                    "4da5eb01-c0ab-4408-b6c0-6c3f133be665",
     "pipelineId":                   "510c7608-62ac-43bd-b114-d28475125118",
     "userReference":                "dragen_germline_enrichment_v4-4-4_BATCH_PoN",

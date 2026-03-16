@@ -530,6 +530,57 @@ process deleteData {
     """
 }
 
+process addDragenToolAnnotation {
+    debug true
+    tag "Add TOOLS=DRAGEN annotation"
+    label 'icav2-dragen'
+    publishDir "${params.localDownloadPath}", mode: 'copy', overwrite: true
+    cpus 1
+
+    input:
+    path(dataFile)
+
+    output:
+    path "*_DRAGEN_output.annotated.vcf.gz", emit: annotated_vcfs, optional: true
+
+    script:
+    def downloadPath = params.localDownloadPath
+    """
+    #!/bin/bash
+    set -euo pipefail
+
+    echo "Annotating downloaded DRAGEN VCF files with TOOLS=DRAGEN in INFO field..."
+
+    printf '##INFO=<ID=TOOLS,Number=1,Type=String,Description="Source caller tool">\\n' > extra_header.txt
+
+    found=0
+    while IFS= read -r vcf; do
+        found=1
+        sample_name=\$(basename "\$vcf" | sed 's/\\.vcf\\.gz\$//' | sed 's/\\.vcf\$//')
+
+        bcftools query -f '%CHROM\\t%POS0\\t%END\\n' "\$vcf" | \\
+            awk 'BEGIN{OFS="\\t"} {print \$1, \$2, \$3, "DRAGEN"}' | \\
+            bgzip -c > "\${sample_name}_tools_annot.bed.gz"
+        tabix -p bed "\${sample_name}_tools_annot.bed.gz"
+
+        bcftools annotate \\
+            -a "\${sample_name}_tools_annot.bed.gz" \\
+            -c CHROM,FROM,TO,INFO/TOOLS \\
+            -h extra_header.txt \\
+            "\$vcf" \\
+            -O z -o "\${sample_name}_DRAGEN_output.annotated.vcf.gz"
+
+        rm -f "\${sample_name}_tools_annot.bed.gz" "\${sample_name}_tools_annot.bed.gz.tbi"
+    done < <(find ${downloadPath} -type f \\( -name "*.vcf.gz" -o -name "*.vcf" \\) 2>/dev/null || true)
+
+    if [ \$found -eq 0 ]; then
+        echo "No VCF files found in ${downloadPath}. Skipping annotation."
+    else
+        echo "TOOLS=DRAGEN annotation complete."
+    fi
+    """
+}
+
 // =====================================================================================
 // SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
 // =====================================================================================
@@ -564,6 +615,10 @@ workflow ICAV2_DRAGEN {
     // Step 8: Clean up temporary CRAM files and output folder from ICA
     deleteData(downloadAnalysisOutput.out.dataFile)
 
+    // Step 9: Annotate downloaded VCF files with TOOLS=DRAGEN in INFO field
+    addDragenToolAnnotation(downloadAnalysisOutput.out.dataFile)
+
     emit:
     result = downloadAnalysisOutput.out.dataFile
+    annotated_vcfs = addDragenToolAnnotation.out.annotated_vcfs
 }

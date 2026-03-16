@@ -1,4 +1,5 @@
 {
+    "workflow": "clamms",
     "ref": "/path/to/reference.fasta",
     "probes": "/path/to/probes.bed",
     "outdir": "./results",

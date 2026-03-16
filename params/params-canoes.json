@@ -1,11 +1,8 @@
 {
     "workflow": "canoes",
-    "ref": "/path/to/reference.fasta",
-    "probes": "/path/to/probes.bed",
     "outdir": "./results",
-    "bam_list": "/path/to/bam_list.txt",
-    "gc_stats": true,
-    "run_canoes_script": "/path/to/run_canoes.R",
-    "convert_script": "/path/to/canoes_csv_to_vcf.py",
-    "verbose": false
+    "samplesheet_bams": "/path/to/samplesheet.tsv",
+    "ref": "/path/to/reference.fasta",
+    "fai": "/path/to/reference.fasta.fai",
+    "probes": "/path/to/probes.bed"
 }

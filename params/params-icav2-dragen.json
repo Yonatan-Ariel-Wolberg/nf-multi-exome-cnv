@@ -1,8 +1,8 @@
 {
     "workflow":                     "dragen",
-    "projectId":                    "4da5eb01-c0ab-4408-b6c0-6c3f133be665",
-    "pipelineId":                   "510c7608-62ac-43bd-b114-d28475125118",
-    "userReference":                "dragen_germline_enrichment_v4-4-4_BATCH_PoN",
+    "projectId":                    "/path/to/ica/project-id",
+    "pipelineId":                   "/path/to/ica/pipeline-id",
+    "userReference":                "dragen_germline_enrichment_BATCH",
     "storageSize":                  "Large",
 
     "referenceAnalysisDataCode":    "ref_tar",
@@ -11,13 +11,13 @@
     "cramIndexAnalysisDataCode":    "crais",
     "cramReferenceAnalysisDataCode": "cram_reference",
 
-    "referenceFileId":              "fil.16792b89689a48aeb1b708dd7845ec0e",
-    "cramReferenceFileId":          "fil.6a4c994f9c704313a63c08de206ef255",
-    "targetBedFileId":              "fil.9c37daa4b1fa442b43da08de5ea7b6c7",
+    "referenceFileId":              "/path/to/ica/reference-file-id",
+    "cramReferenceFileId":          "/path/to/ica/cram-reference-file-id",
+    "targetBedFileId":              "/path/to/ica/target-bed-file-id",
 
-    "localDownloadPath":            "/home/ywolberg/DRAGEN/DDD5/ica_downloads",
-    "cramFilePairsUploadPath":      "/home/ywolberg/DRAGEN/DDD5/ica_upload_data/**/*",
-    "icaUploadPath":                "/DDD5/",
+    "localDownloadPath":            "/path/to/local/download/directory",
+    "cramFilePairsUploadPath":      "/path/to/cram/files/**/*",
+    "icaUploadPath":                "/path/to/ica/upload/directory/",
 
     "maxUploadForks":               4,
     "uploadRetries":                3,

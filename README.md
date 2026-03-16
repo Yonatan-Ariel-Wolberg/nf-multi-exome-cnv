@@ -67,3 +67,93 @@ cd nf-multicaller-exomecnv
 ```bash
 apptainer build icav2_cli_v2.43.0.sif icav2.def
 ```
+
+## Scalability: running 50, 300, or 2000 samples
+
+The pipeline ships with three cohort-size profiles that pre-configure the
+scheduler, concurrency, and per-caller batch sizes for small, medium, and large
+runs.  Combine a cohort-size profile with the site profile using `-profile`:
+
+```bash
+# ≤ 50 samples
+nextflow run main.nf -profile wits,small  -params-file params/params-canoes.json
+
+# 50–300 samples (default behaviour if no cohort-size profile is specified)
+nextflow run main.nf -profile wits,medium -params-file params/params-canoes.json
+
+# 300–2000 samples
+nextflow run main.nf -profile wits,large  -params-file params/params-canoes.json
+```
+
+### What each profile controls
+
+| Setting | `small` (≤50) | `medium` (50–300) | `large` (300–2000) |
+|---|---|---|---|
+| `executor.queueSize` | 100 | 500 | 2000 |
+| `executor.submitRateLimit` | 5/sec | 10/sec | 20/sec |
+| `process.maxForks` | 25 | 100 | 200 |
+| `canoes_batch_size` | 50 | 100 | 200 |
+| `xhmm_batch_size` | 25 | 50 | 100 |
+| GATK memory | 16 GB | 16 GB | 32 GB |
+| `large_mem` label | 64 GB / 8 CPUs | 64 GB / 8 CPUs | 128 GB / 16 CPUs |
+| `gpu_or_high_cpu` label | 32 GB / 16 CPUs | 32 GB / 16 CPUs | 64 GB / 32 CPUs |
+
+### Caller-specific notes
+
+#### CANOES (`--workflow canoes`)
+CANOES uses `bedtools multicov` to count reads across all BAMs simultaneously.
+Running a single `multicov` job over thousands of BAMs at once exhausts both
+memory and file-descriptor limits.  The pipeline therefore splits the BAM list
+into fixed-size batches (`canoes_batch_size`) and runs one `multicov` job per
+batch per chromosome; the per-batch matrices are then merged.
+
+- **`canoes_batch_size`** (default `100`; override in params file or via profile):
+  - Up to 50 samples → set to `50` (1 batch; minimal overhead).
+  - Up to 300 samples → set to `100` (3 batches per chromosome).
+  - Up to 2000 samples → set to `200` (10 batches per chromosome).
+
+#### XHMM (`--workflow xhmm`)
+XHMM uses GATK `DepthOfCoverage`, which can require significant memory per job
+when given a large BAM list.  The BAM list is split into fixed-size groups
+(`xhmm_batch_size`) and one `GATK_DOC` job is submitted per group.
+
+- **`xhmm_batch_size`** (default `50`; override in params file or via profile):
+  - Up to 50 samples → set to `25`–`50` (1–2 batches).
+  - Up to 300 samples → set to `50` (up to 6 batches).
+  - Up to 2000 samples → set to `100` (up to 20 batches; keeps memory per job manageable).
+
+#### CLAMMS (`--workflow clamms`)
+All CLAMMS steps (depth-of-coverage, normalisation, model training, CNV calling)
+are fully per-sample and run in parallel automatically via Nextflow's data-flow
+model.  No batch-size tuning is needed; `process.maxForks` limits the number of
+concurrent per-sample jobs.
+
+#### GATK-gCNV (`--workflow gcnv`)
+gCNV trains a cohort-level model and is naturally designed for large cohorts.
+Interval parallelism is controlled by `scatter_count` in
+`params/params-gatk-gcnv.json` (default `5000`).  For the cohort-level steps
+(`FilterIntervals`, `DetermineGermlineContigPloidy`, `GermlineCNVCaller`) that
+collect all samples at once, increase the memory/CPU limits using the `large`
+profile when running hundreds or thousands of samples.
+
+#### CNVkit (`--workflow cnvkit`)
+CNVkit processes samples independently; concurrency is governed by
+`process.maxForks`.  Use `test_size` (integer) or `test_list` (comma-separated
+sample IDs) in the params file to restrict a run to a subset of samples during
+development.
+
+#### DRAGEN / ICAv2 (`--workflow dragen`)
+DRAGEN runs are submitted to the ICAv2 platform.  `maxUploadForks` (default `4`)
+limits simultaneous CRAM uploads.  Increase this if your network bandwidth and
+ICA account limits allow it.
+
+#### SURVIVOR / Truvari (`--workflow survivor` / `--workflow truvari`)
+These consensus modules are fast and lightweight regardless of cohort size; no
+additional tuning is required.
+
+### Disk and I/O considerations
+- Intermediate files (depth-of-coverage, read-count matrices, normalised
+  coverages) grow proportionally with cohort size.  Ensure the working directory
+  has sufficient free space: budget ~2–5 GB per sample.
+- Setting `process.stageInMode = 'symlink'` (the default) avoids copying large
+  BAM/CRAM files into each work directory.

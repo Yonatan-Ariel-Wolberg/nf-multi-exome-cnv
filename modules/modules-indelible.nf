@@ -184,11 +184,14 @@ process filterINDELIBLE {
 
 workflow INDELIBLE {
     take:
-    bam_ch  // channel: tuple(sample, bam, bai)
+    crams_ch        // channel: tuple(sample, bam, bai)
+    cram_trios_ch   // channel: tuple(sample, child_bam, child_bai, mom_bam, mom_bai, dad_bam, dad_bai)
+    cram_mom_ch     // channel: tuple(sample, child_bam, child_bai, mom_bam, mom_bai)
+    cram_dad_ch     // channel: tuple(sample, child_bam, child_bai, dad_bam, dad_bai)
 
     main:
     // Step 1: Extract split/clipped reads from BAM files
-    run_Fetch(bam_ch)
+    run_Fetch(crams_ch)
 
     // Step 2: Aggregate read information to a position-level view
     run_Aggregate(run_Fetch.out.sc_reads)
@@ -202,9 +205,21 @@ workflow INDELIBLE {
     // Step 5: Annotate positions with gene/exon information
     run_Annotate(run_Database.out.indel_database, run_Score.out.scores)
 
-    // Step 6: Filter annotated results by confidence thresholds
+    // Step 6: Identify de novo mutations in complete trios
+    run_DenovoTrio(cram_trios_ch.join(run_Annotate.out.annotated))
+
+    // Step 7: Identify de novo mutations with mother only
+    run_DenovoMom(cram_mom_ch.join(run_Annotate.out.annotated))
+
+    // Step 8: Identify de novo mutations with father only
+    run_DenovoDad(cram_dad_ch.join(run_Annotate.out.annotated))
+
+    // Step 9: Filter annotated results by confidence thresholds
     filterINDELIBLE(run_Annotate.out.annotated)
 
     emit:
-    filtered_cnvs = filterINDELIBLE.out.filtered_cnvs
+    filtered_cnvs        = filterINDELIBLE.out.filtered_cnvs
+    indelible_denovo     = run_DenovoTrio.out.indelible_denovo
+    indelible_denovo_mom = run_DenovoMom.out.indelible_denovo_mom
+    indelible_denovo_dad = run_DenovoDad.out.indelible_denovo_dad
 }

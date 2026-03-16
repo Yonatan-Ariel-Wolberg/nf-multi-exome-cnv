@@ -4,15 +4,15 @@ nextflow.enable.dsl=2
 // =====================================================================================
 // MODULE INCLUDES
 // =====================================================================================
-include { run_Fetch; run_Aggregate; run_Score; run_Database; run_Annotate; run_DenovoTrio; run_DenovoMom; run_DenovoDad; filterINDELIBLE } from './modules/modules-indelible.nf'
+include { INDELIBLE } from './modules/modules-indelible.nf'
 include { CANOES } from './modules/modules-canoes.nf'
 include { XHMM } from './modules/modules-xhmm.nf'
 include { CLAMMS } from './modules/modules-clamms.nf'
-include { uploadCramFiles; getStaticFiles; checkFileStatus; startAnalysisBatch; checkAnalysisStatus; downloadAnalysisOutput; deleteData; addDragenToolAnnotation } from './modules/modules-icav2-dragen.nf'
+include { DRAGEN } from './modules/modules-icav2-dragen.nf'
 include { CNVKIT } from './modules/modules-cnvkit.nf'
 include { GATK_GCNV } from './modules/modules-gatk-gcnv.nf'
-include { runSurvivorMerge } from './modules/modules-survivor.nf'
-include { runTruvariCollapse } from './modules/modules-truvari.nf'
+include { SURVIVOR } from './modules/modules-survivor.nf'
+include { TRUVARI } from './modules/modules-truvari.nf'
 
 // =====================================================================================
 // GLOBAL SETUP
@@ -58,15 +58,7 @@ workflow RUN_INDELIBLE {
         cram_mom
         cram_dad
     main:
-        run_Fetch(crams)
-        run_Aggregate(run_Fetch.out.sc_reads)
-        run_Score(run_Aggregate.out.counts)
-        run_Database(run_Score.out.database_in.collect())
-        run_Annotate(run_Database.out.indel_database, run_Score.out.scores)
-        run_DenovoTrio(cram_trios.join(run_Annotate.out.annotated))
-        run_DenovoMom(cram_mom.join(run_Annotate.out.annotated))
-        run_DenovoDad(cram_dad.join(run_Annotate.out.annotated))
-        filterINDELIBLE(run_Annotate.out.annotated)
+        INDELIBLE(crams, cram_trios, cram_mom, cram_dad)
 }
 
 workflow RUN_CANOES {
@@ -100,15 +92,7 @@ workflow RUN_DRAGEN {
     take: 
         cramPairs
     main:
-        uploadCramFiles(cramPairs)
-        allUploads = uploadCramFiles.out.dataFile.collectFile(name: 'all_data.txt', keepHeader: false, newLine: true)
-        getStaticFiles(allUploads)
-        checkFileStatus(getStaticFiles.out.dataFile)
-        startAnalysisBatch(checkFileStatus.out.dataFile)
-        checkAnalysisStatus(startAnalysisBatch.out.dataFile)
-        downloadAnalysisOutput(checkAnalysisStatus.out.dataFile)
-        deleteData(downloadAnalysisOutput.out.dataFile)
-        addDragenToolAnnotation(downloadAnalysisOutput.out.dataFile)
+        DRAGEN(cramPairs)
 }
 
 workflow RUN_CNVKIT {
@@ -141,7 +125,7 @@ workflow RUN_SURVIVOR {
             .groupTuple()
             .filter { sample_id, vcfs -> vcfs.size() >= 2 }
             
-        runSurvivorMerge(grouped_vcfs)
+        SURVIVOR(grouped_vcfs)
 }
 
 workflow RUN_TRUVARI {
@@ -153,7 +137,7 @@ workflow RUN_TRUVARI {
             .groupTuple()
             .filter { sample_id, vcfs -> vcfs.size() >= 2 }
             
-        runTruvariCollapse(grouped_vcfs)
+        TRUVARI(grouped_vcfs)
 }
 
 // =====================================================================================

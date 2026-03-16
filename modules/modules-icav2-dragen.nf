@@ -357,6 +357,14 @@ process START_ANALYSIS_BATCH {
     bed_id=\$(grep '^${bedCode}:' ${dataFile} | cut -f2- -d: | tr -d '[:space:]')
     cram_ref_id=\$(grep '^${cramRefCode}:' ${dataFile} | cut -f2- -d: | tr -d '[:space:]')
 
+    # Validate minimum 5 samples required for the in-run panel of normals (cnv_enable_in_run_pon)
+    sample_count=\$(grep -c "^${cramCode}:" ${dataFile} || true)
+    if [ "\$sample_count" -lt 5 ]; then
+        echo "Error: DRAGEN Germline Enrichment requires a minimum of 5 samples to enable the in-run panel of normals (cnv_enable_in_run_pon). Found \${sample_count} sample(s); please provide at least 5." >&2
+        exit 1
+    fi
+    echo "Sample count: \${sample_count} (minimum 5 satisfied for in-run panel of normals)"
+
     # Aggregate lists for batch analysis
     cram_ids_list=\$(grep '^${cramCode}:' ${dataFile} | cut -f2- -d: | tr -d '\r' | sort -u | paste -sd "," -)
     crai_ids_list=\$(grep '^${craiCode}:' ${dataFile} | cut -f2- -d: | tr -d '\r' | sort -u | paste -sd "," -)
@@ -647,8 +655,18 @@ workflow DRAGEN {
     cram_ch  // channel: tuple(sampleId, [cram_file, crai_file])
 
     main:
+    // Validate minimum 5 samples required for the in-run panel of normals (cnv_enable_in_run_pon)
+    validated_cram_ch = cram_ch
+        .collect()
+        .flatMap { items ->
+            if (items.size() < 5) {
+                error "DRAGEN Germline Enrichment requires a minimum of 5 samples to enable the in-run panel of normals (cnv_enable_in_run_pon). Found ${items.size()} sample(s); please provide at least 5."
+            }
+            return items
+        }
+
     // Step 1: Upload CRAM and CRAI files to ICA for each sample
-    UPLOAD_CRAM_FILES(cram_ch)
+    UPLOAD_CRAM_FILES(validated_cram_ch)
 
     // Step 2: Combine all per-sample upload data into a single file
     combined_upload_ch = UPLOAD_CRAM_FILES.out.dataFile

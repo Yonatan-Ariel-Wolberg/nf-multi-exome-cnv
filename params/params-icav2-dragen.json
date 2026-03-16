@@ -1,31 +1,27 @@
 {
-  projectId                   = "4da5eb01-c0ab-4408-b6c0-6c3f133be665"
-  pipelineId                  = "510c7608-62ac-43bd-b114-d28475125118"
-  userReference               = "dragen_germline_enrichment_v4-4-4_BATCH_PoN"
-  storageSize                 = "Large"
+    "projectId":                    "4da5eb01-c0ab-4408-b6c0-6c3f133be665",
+    "pipelineId":                   "510c7608-62ac-43bd-b114-d28475125118",
+    "userReference":                "dragen_germline_enrichment_v4-4-4_BATCH_PoN",
+    "storageSize":                  "Large",
 
-  referenceAnalysisDataCode   = "ref_tar"
-  targetBedAnalysisDataCode   = "target_bed"
-  cramAnalysisDataCode        = "crams"
-  cramIndexAnalysisDataCode   = "crais"
-  cramReferenceAnalysisDataCode = "cram_reference"
+    "referenceAnalysisDataCode":    "ref_tar",
+    "targetBedAnalysisDataCode":    "target_bed",
+    "cramAnalysisDataCode":         "crams",
+    "cramIndexAnalysisDataCode":    "crais",
+    "cramReferenceAnalysisDataCode": "cram_reference",
 
-  referenceFileId             = "fil.16792b89689a48aeb1b708dd7845ec0e"
-  cramReferenceFileId         = "fil.6a4c994f9c704313a63c08de206ef255"
+    "referenceFileId":              "fil.16792b89689a48aeb1b708dd7845ec0e",
+    "cramReferenceFileId":          "fil.6a4c994f9c704313a63c08de206ef255",
+    "targetBedFileId":              "fil.9c37daa4b1fa442b43da08de5ea7b6c7",
 
-  targetBedFileId             = "fil.9c37daa4b1fa442b43da08de5ea7b6c7"
+    "localDownloadPath":            "/home/ywolberg/DRAGEN/DDD5/ica_downloads",
+    "cramFilePairsUploadPath":      "/home/ywolberg/DRAGEN/DDD5/ica_upload_data/**/*",
+    "icaUploadPath":                "/DDD5/",
 
-  localDownloadPath           = "/home/ywolberg/DRAGEN/DDD5/ica_downloads"
-  cramFilePairsUploadPath     = "/home/ywolberg/DRAGEN/DDD5/ica_upload_data/**/*"
-  icaUploadPath               = "/DDD5/"
-
-  maxUploadForks              = 4
-  maxAnalysisForks            = 50
-  uploadRetries               = 3
-  uploadRetryDelay            = 10
-  fileStatusCheckInterval     = 20
-  fileStatusCheckLimit        = 100
-  analysisStatusCheckInterval = 300
-  analysisStatusCheckLimit    = 288
-
+    "maxUploadForks":               4,
+    "uploadRetries":                3,
+    "fileStatusCheckInterval":      20,
+    "fileStatusCheckLimit":         100,
+    "analysisStatusCheckInterval":  300,
+    "analysisStatusCheckLimit":     288
 }

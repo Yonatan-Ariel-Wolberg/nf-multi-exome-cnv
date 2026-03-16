@@ -210,11 +210,12 @@ workflow {
                 .map { it -> [it.baseName, it] }.groupTuple(size: 2)
                 .map { id, files -> [id, files.find { it.extension == 'bam' }, files.find { it.extension == 'bai' }] }
                 .filter { id, bam, bai -> 
-                    (params.test_list != "all" && params.test_list != "") ? params.test_list.tokenize(',').contains(id) : true 
+                    def tl = params.get('test_list', 'all')
+                    (tl != "all" && tl != "") ? tl.tokenize(',').contains(id) : true 
                 }
                 .set { ch_bams_filtered }
             
-            ch_bams_final = (params.test_size.toInteger() > 0) ? ch_bams_filtered.take(params.test_size.toInteger()) : ch_bams_filtered
+            ch_bams_final = (params.get('test_size', -1).toInteger() > 0) ? ch_bams_filtered.take(params.get('test_size', -1).toInteger()) : ch_bams_filtered
             RUN_CNVKIT(ch_bams_final, file(params.fasta), file(params.targets), file(params.refflat))
             break
 

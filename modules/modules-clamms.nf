@@ -179,7 +179,8 @@ process COMBINE_PICARD_QC_METRICS {
     #!/bin/bash
     set -euo pipefail
     echo "Combining QC metrics..."
-    combine_picard_qc_metrics.sh > combined_qc_metrics.txt
+    combine_picard_qc_metrics.sh
+    mv qcs_metrics combined_qc_metrics.txt
     echo "Combined QC metrics saved to: combined_qc_metrics.txt"
     """
 }

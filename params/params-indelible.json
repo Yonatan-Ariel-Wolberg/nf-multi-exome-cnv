@@ -4,5 +4,6 @@
     "crams": "/path/to/crams/directory",
     "ref": "/path/to/reference.fasta",
     "priors": "/path/to/priors.txt",
-    "indelible_conf": "/path/to/indelible_config.json"
+    "indelible_conf": "/path/to/indelible_config.json",
+    "fai": "/path/to/reference.fasta.fai"
 }

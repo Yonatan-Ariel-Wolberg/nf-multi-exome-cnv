@@ -7,5 +7,5 @@
     "cnvkit_dir": "./results/out_CNVKIT/vcfs",
     "gcnv_dir": "./results/out_GCNV/vcfs",
     "dragen_dir": "./results/out_DRAGEN/vcfs",
-    "indelible_dir": "./results/out_INDELIBLE/filtered"
+    "indelible_dir": "./results/out_INDELIBLE/vcfs"
 }

@@ -41,14 +41,15 @@ process RUN_SURVIVOR_MERGE {
     done
 
     # Run SURVIVOR merge with the specified parameters
+    # Args: list max_dist min_support use_type use_strand est_dist min_sv_size output
     SURVIVOR merge \\
         \$list_file \\
-        1000 \\      # max distance
-        1 \\         # min support
-        1 \\         # use type
-        0 \\         # use strand
-        0 \\         # estimate distance
-        30 \\        # min size
+        1000 \\
+        1 \\
+        1 \\
+        0 \\
+        0 \\
+        30 \\
         "${sample_id}_survivor_merged.vcf"
     """
 }

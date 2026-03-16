@@ -1,6 +1,8 @@
 # nf-multicaller-exomecnv
 
-# Tools
+A Nextflow pipeline for comprehensive genomic analysis combining multiple variant callers with exome and copy number variation (CNV) detection. Based on a workflow by **Dr Phelelani T Mpangase** (phelelani): https://github.com/phelelani/nf-exomecnv. The modules-icav2-dragen.nf module is based off a script by **Regan Cannell** (RWCannell): https://github.com/SBIMB/ica-elwazi/tree/main/nextflow_workflows/cram_input_dragen_ica_workflow.
+
+## Tools
 
 **CANOES**: https://github.com/ShenLab/CANOES
 
@@ -21,11 +23,6 @@
 **Truvari**: https://github.com/ACEnglish/truvari
 
 **SURVIVOR**: https://github.com/fritzsedlazeck/SURVIVOR
-
-
-# nf-multicaller-exomecnv
-
-A Nextflow pipeline for comprehensive genomic analysis combining multiple variant callers with exome and copy number variation (CNV) detection. Based on a workflow by **Dr Phelelani T Mpangase** (phelelani): https://github.com/phelelani/nf-exomecnv. The modules-icav2-dragen.nf module is based off a script by **Regan Cannell** (RWCannell): https://github.com/SBIMB/ica-elwazi/tree/main/nextflow_workflows/cram_input_dragen_ica_workflow.
 
 ## Overview
 
@@ -67,6 +64,65 @@ cd nf-multicaller-exomecnv
 ```bash
 apptainer build icav2_cli_v2.43.0.sif icav2.def
 ```
+
+## Usage
+
+Each workflow is run by providing `--workflow <name>` along with a params file. Edit the corresponding `params/*.json` file to point to your actual input files before running.
+
+### Individual CNV callers
+
+The individual callers should be run first. Their VCF outputs feed into the consensus modules (SURVIVOR / Truvari).
+
+```bash
+# CANOES — exome CNV caller using read-depth and PCA normalisation
+nextflow run main.nf --workflow canoes -params-file params/params-canoes.json
+
+# XHMM — exome CNV caller using GATK depth-of-coverage and PCA
+nextflow run main.nf --workflow xhmm -params-file params/params-xhmm.json
+
+# CLAMMS — exome CNV caller using nearest-neighbour normalisation
+nextflow run main.nf --workflow clamms -params-file params/params-clamms.json
+
+# GATK-gCNV — cohort-mode germline CNV caller from the Broad Institute
+nextflow run main.nf --workflow gcnv -params-file params/params-gatk-gcnv.json
+
+# CNVkit — coverage-based CNV caller with pooled reference normalisation
+nextflow run main.nf --workflow cnvkit -params-file params/params-cnvkit.json
+
+# DRAGEN — Illumina DRAGEN germline enrichment pipeline via ICAv2
+nextflow run main.nf --workflow dragen -params-file params/params-icav2-dragen.json
+
+# InDelible — small insertion/deletion caller from split reads
+nextflow run main.nf --workflow indelible -params-file params/params-indelible.json
+```
+
+### Consensus modules (run after individual callers)
+
+Point the `*_dir` paths in the params file to the VCF output directories produced by the callers above, then run:
+
+```bash
+# SURVIVOR — merge per-caller VCFs into a consensus call set
+nextflow run main.nf --workflow survivor -params-file params/params-survivor.json
+
+# Truvari — collapse per-caller VCFs into a consensus call set
+nextflow run main.nf --workflow truvari -params-file params/params-truvari.json
+```
+
+### Parameter files
+
+All required and optional parameters for each workflow are documented in the corresponding `params/*.json` template:
+
+| Params file | Workflow |
+|---|---|
+| `params/params-canoes.json` | `--workflow canoes` |
+| `params/params-xhmm.json` | `--workflow xhmm` |
+| `params/params-clamms.json` | `--workflow clamms` |
+| `params/params-gatk-gcnv.json` | `--workflow gcnv` |
+| `params/params-cnvkit.json` | `--workflow cnvkit` |
+| `params/params-icav2-dragen.json` | `--workflow dragen` |
+| `params/params-indelible.json` | `--workflow indelible` |
+| `params/params-survivor.json` | `--workflow survivor` |
+| `params/params-truvari.json` | `--workflow truvari` |
 
 ## Scalability: running 50, 300, or 2000 samples
 

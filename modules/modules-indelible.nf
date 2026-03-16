@@ -162,7 +162,7 @@ process RUN_DENOVO_DAD {
 
 // Filter the results from Indelible
 process FILTER_INDELIBLE {
-    tag { 'filter_cnvs' }
+    tag { sample }
     label 'indelible'
     publishDir "${outdir}/out_INDELIBLE/filtered", mode: 'copy', overwrite: true
     
@@ -170,11 +170,34 @@ process FILTER_INDELIBLE {
     tuple val(sample), path(annotated)
     
     output:
-    path("${sample}.annotated.filtered.tsv"), emit: filtered_cnvs
+    tuple val(sample), path("${sample}.annotated.filtered.tsv"), emit: filtered_cnvs
     
     script:
     """
     awk '{ if ((\$39 < 2) && (\$40 < 2)) { print } }' ${annotated} > ${sample}.annotated.filtered.tsv
+    """
+}
+
+// Process to convert INDELIBLE filtered TSV to VCF using the Python script
+process CONVERT_INDELIBLE_TO_VCF {
+    tag "${sample_id}"
+    label 'indelible'
+    publishDir "${outdir}/out_INDELIBLE/vcfs", mode: 'copy', overwrite: true
+
+    input:
+    tuple val(sample_id), path(filtered_tsv)
+
+    output:
+    path("${sample_id}_INDELIBLE_output.vcf"), emit: vcfs
+
+    script:
+    def fai_arg = params.get('fai', null) ? "--fai_file ${file(params.fai)}" : ""
+    """
+    indelible_tsv_to_vcf.py \\
+        --input_file ${filtered_tsv} \\
+        --sample_id ${sample_id} \\
+        --output_dir . \\
+        ${fai_arg}
     """
 }
 
@@ -266,9 +289,17 @@ workflow INDELIBLE {
     // Step 9: Filter annotated results by confidence thresholds
     FILTER_INDELIBLE(RUN_ANNOTATE.out.annotated)
 
+    // Step 10: Convert filtered TSV to VCF
+    CONVERT_INDELIBLE_TO_VCF(FILTER_INDELIBLE.out.filtered_cnvs)
+
+    // Step 11: Compress, sort, index, and annotate each VCF with TOOL=INDELIBLE
+    BGZIP_SORT_INDEX_VCF(CONVERT_INDELIBLE_TO_VCF.out.vcfs)
+
     emit:
     filtered_cnvs        = FILTER_INDELIBLE.out.filtered_cnvs
     indelible_denovo     = RUN_DENOVO_TRIO.out.indelible_denovo
     indelible_denovo_mom = RUN_DENOVO_MOM.out.indelible_denovo_mom
     indelible_denovo_dad = RUN_DENOVO_DAD.out.indelible_denovo_dad
+    sorted_vcf           = BGZIP_SORT_INDEX_VCF.out.sorted_vcf
+    sorted_vcf_index     = BGZIP_SORT_INDEX_VCF.out.sorted_vcf_index
 }

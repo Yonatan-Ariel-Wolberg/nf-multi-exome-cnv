@@ -298,8 +298,8 @@ process convertClammsToVcf {
 }
 
 // Process to bgzip, sort, index, and annotate the produced VCF file with TOOL=CLAMMS
-process run_BCFtools {
-    tag "bcftools"
+process BGZIP_SORT_INDEX_VCF {
+    tag "${vcf_file.simpleName}"
     label 'clamms|bedtools'
     publishDir "${outdir}/out_CLAMMS/vcfs", mode: 'copy', overwrite: true
 
@@ -416,9 +416,9 @@ workflow CLAMMS {
     )
 
     // Step 12: Sort, compress, and index the VCF
-    run_BCFtools(convertClammsToVcf.out.vcfs)
+    BGZIP_SORT_INDEX_VCF(convertClammsToVcf.out.vcfs)
 
     emit:
-    sorted_vcf       = run_BCFtools.out.sorted_vcf
-    sorted_vcf_index = run_BCFtools.out.sorted_vcf_index
+    sorted_vcf       = BGZIP_SORT_INDEX_VCF.out.sorted_vcf
+    sorted_vcf_index = BGZIP_SORT_INDEX_VCF.out.sorted_vcf_index
 }

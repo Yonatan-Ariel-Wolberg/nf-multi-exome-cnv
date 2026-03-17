@@ -305,7 +305,7 @@ will be reduced.
 | **CLAMMS** | Nearest-neighbour reference panel | 30 | Nearest-neighbour selection quality degrades when the reference pool is small |
 | **GATK-gCNV** | Probabilistic cohort model | 30 | The Broad recommends ≥ 30 samples for the COHORT mode model to be well-calibrated |
 | **CNVkit** | Pooled reference (bias correction) | 10 | A pooled reference with as few as 10 samples provides reasonable GC and mappability correction; larger cohorts improve accuracy |
-| **DRAGEN** | Illumina platform normalisation | N/A | Normalisation is handled internally by the DRAGEN pipeline on the ICAv2 platform |
+| **DRAGEN** | Illumina platform normalisation | N/A | Normalisation is handled internally by the DRAGEN pipeline on the ICAv2 platform. ≥ 5 samples (inclusive) are required to create the 'in-run' PoN. ≥ 30 samples required for Targeted CNV Calling |
 
 > **Note:** `canoes_batch_size` and `xhmm_batch_size` control how many BAMs are
 > processed per parallel job, not how many samples participate in normalisation.

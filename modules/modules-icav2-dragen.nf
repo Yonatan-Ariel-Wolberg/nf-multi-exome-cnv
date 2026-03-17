@@ -399,7 +399,7 @@ process START_ANALYSIS_BATCH {
         --parameters cnv_enable_gcbias_correction:true \
         --parameters enable_sv:true \
         --parameters qc_coverage_report:cov_report \
-        --parameters qc_coverage_filters:"'mapq<1'" \
+        --parameters qc_coverage_filters:"'mapq<20,bq<20'" \
         --parameters qc_detect_contamination:true \
         --parameters enable_variant_annotation:true \
         --parameters samples_per_node:5 2>&1 || true)

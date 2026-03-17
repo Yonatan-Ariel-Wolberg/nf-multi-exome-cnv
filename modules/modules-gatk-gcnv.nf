@@ -6,9 +6,9 @@ nextflow.enable.dsl=2
 // =====================================================================================
 params {
     outdir = './output' // Change to your desired output path
-    bin_length = 1000 // Example parameter for bin length
-    padding = 100 // Example parameter for padding
-    scatter_count = 10 // Example parameter for scatter count
+    bin_length = 0     // 0 = no binning for exome (each target interval is its own bin); use >0 for WGS
+    padding = 250      // 250 bp padding per GATK gCNV exome best practice
+    scatter_count = 5000 // SCATTER_CONTENT: max intervals per shard (used with INTERVAL_COUNT mode)
     is_wgs = false // Set to false indicating the analysis is exome sequencing
 }
 
@@ -155,6 +155,7 @@ process DETERMINE_PLOIDY_COHORT {
     """
     echo "${counts.join('\n')}" > counts_files.list
     gatk --java-options "-Xmx16g" DetermineGermlineContigPloidy \\
+        --run-mode COHORT \\
         -L $intervals \\
         -I counts_files.list \\
         --contig-ploidy-priors $priors \\
@@ -198,11 +199,12 @@ process GERMLINE_CNV_CALLER_COHORT {
     path ploidy_calls
     
     output: 
-    path "shard-calls", emit: calls
-    path "shard-model", emit: model
+    path "${interval_shard.parent.name}-calls", emit: calls
+    path "${interval_shard.parent.name}-model", emit: model
     
     script:
     def sensitivity_params = "--class-coherence-length 1000.0 --cnv-coherence-length 1000.0 --enable-bias-factors false --interval-psi-scale 1.0E-6 --log-mean-bias-standard-deviation 0.01 --sample-psi-scale 1.0E-6"
+    def shard_prefix = interval_shard.parent.name
     """
     echo "${counts.join('\n')}" > counts_files.list
     gatk --java-options "-Xmx16g" GermlineCNVCaller \\
@@ -212,7 +214,7 @@ process GERMLINE_CNV_CALLER_COHORT {
         --contig-ploidy-calls $ploidy_calls \\
         --annotated-intervals $annotated \\
         --output . \\
-        --output-prefix shard \\
+        --output-prefix ${shard_prefix} \\
         -imr OVERLAPPING_ONLY \\
         $sensitivity_params
     """
@@ -232,16 +234,21 @@ process POSTPROCESS_CALLS {
     path dict
     
     output: 
-    path "${sample_id}.genotyped_segments.vcf.gz", emit: final_vcf
+    tuple val(sample_id), path("${sample_id}.genotyped_segments.vcf.gz"), emit: final_vcf
     path "${sample_id}.genotyped_intervals.vcf.gz", emit: intervals_vcf
     
     script:
-    def model_args = model_shards.collect { "--model-shard-path \$it" }.join(" ")
-    def call_args = call_shards.collect { "--calls-shard-path \$it" }.join(" ")
+    // Sort shards by directory name so PostprocessGermlineCNVCalls receives them
+    // in the correct genomic order (matching the order used by GermlineCNVCaller).
+    def sort_shards = { shards -> (shards instanceof List ? shards : [shards]).sort { a, b -> a.name <=> b.name } }
+    def sorted_call_shards  = sort_shards(call_shards)
+    def sorted_model_shards = sort_shards(model_shards)
+    def call_args  = sorted_call_shards .collect { c -> "--calls-shard-path ${c}" }.join(" \\\n        ")
+    def model_args = sorted_model_shards.collect { m -> "--model-shard-path ${m}" }.join(" \\\n        ")
     """
     gatk --java-options "-Xmx8g" PostprocessGermlineCNVCalls \\
-        \$call_args \\
-        \$model_args \\
+        ${call_args} \\
+        ${model_args} \\
         --contig-ploidy-calls $ploidy_calls \\
         --sample-index $index \\
         --allosomal-contig chrX --allosomal-contig chrY \\
@@ -253,20 +260,22 @@ process POSTPROCESS_CALLS {
 
 // Process to compress, sort, index, and annotate each gCNV VCF with TOOL=GATK-gCNV
 process BGZIP_SORT_INDEX_VCF {
-    tag "${vcf_file.simpleName}"
+    tag "${sample_id}"
     label 'bcftools'
     publishDir "${outdir}/out_GCNV/vcfs", mode: 'copy', overwrite: true
 
     input:
-    path vcf_file
+    tuple val(sample_id), path(vcf_file)
 
     output:
     path("*.sorted.vcf.gz"),     emit: sorted_vcf
     path("*.sorted.vcf.gz.tbi"), emit: sorted_vcf_index
 
     script:
-    def sample_name = vcf_file.name.replaceAll(/\.vcf(\.gz)?$/, '')
-    def sorted_gz   = "${sample_name}.sorted.vcf.gz"
+    // Naming convention: <sample_id>_GCNV_genotyped_segments.sorted.vcf.gz
+    // The "_GCNV" tag is required so that gather_vcfs() can correctly strip it
+    // and recover the bare sample ID when building consensus VCF inputs.
+    def sorted_gz = "${sample_id}_GCNV_genotyped_segments.sorted.vcf.gz"
     """
     # Create extra header line for the TOOL INFO field
     printf '##INFO=<ID=TOOL,Number=1,Type=String,Description="Calling tool">\\n' > extra_header.txt
@@ -274,29 +283,29 @@ process BGZIP_SORT_INDEX_VCF {
     # Build a BED annotation file with TOOL=GATK-gCNV for every variant
     bcftools query -f '%CHROM\\t%POS0\\t%END\\n' ${vcf_file} | \\
         awk 'BEGIN{OFS="\\t"} {print \$1, \$2, \$3, "GATK-gCNV"}' | \\
-        bgzip -c > ${sample_name}_tool_annot.bed.gz
-    tabix -p bed ${sample_name}_tool_annot.bed.gz
+        bgzip -c > ${sample_id}_tool_annot.bed.gz
+    tabix -p bed ${sample_id}_tool_annot.bed.gz
 
     # Annotate the VCF with TOOL=GATK-gCNV in the INFO field
     bcftools annotate \\
-        -a ${sample_name}_tool_annot.bed.gz \\
+        -a ${sample_id}_tool_annot.bed.gz \\
         -c CHROM,FROM,TO,INFO/TOOL \\
         -h extra_header.txt \\
         ${vcf_file} \\
-        -O v -o ${sample_name}_annotated.vcf
+        -O v -o ${sample_id}_GCNV_annotated.vcf
 
     # Compress the annotated VCF with bgzip
-    bgzip -c ${sample_name}_annotated.vcf > ${sample_name}_annotated.vcf.gz
+    bgzip -c ${sample_id}_GCNV_annotated.vcf > ${sample_id}_GCNV_annotated.vcf.gz
 
     # Sort the compressed VCF
-    bcftools sort ${sample_name}_annotated.vcf.gz -o ${sorted_gz} -O z
+    bcftools sort ${sample_id}_GCNV_annotated.vcf.gz -o ${sorted_gz} -O z
 
     # Index the sorted VCF
     tabix -p vcf ${sorted_gz}
 
     # Remove intermediate files
-    rm -f ${sample_name}_tool_annot.bed.gz ${sample_name}_tool_annot.bed.gz.tbi \\
-          ${sample_name}_annotated.vcf ${sample_name}_annotated.vcf.gz
+    rm -f ${sample_id}_tool_annot.bed.gz ${sample_id}_tool_annot.bed.gz.tbi \\
+          ${sample_id}_GCNV_annotated.vcf ${sample_id}_GCNV_annotated.vcf.gz
     """
 }
 
@@ -332,17 +341,25 @@ workflow GATK_GCNV {
         fasta_ch, fai_ch, dict_ch
     )
 
+    // Sort HDF5 count files alphabetically by filename so that every downstream
+    // step (FilterIntervals, DetermineGermlineContigPloidy, GermlineCNVCaller)
+    // receives them in the same deterministic order.  The same order is used
+    // when assigning sample indices for PostprocessGermlineCNVCalls.
+    sorted_counts_ch = COLLECT_READ_COUNTS.out.counts
+        .map { sample_id, hdf5 -> hdf5 }
+        .toSortedList { a, b -> a.name <=> b.name }
+
     // Step 5: Filter intervals based on annotation and read count statistics
     FILTER_INTERVALS(
         PREPROCESS_INTERVALS.out.interval_list,
         ANNOTATE_INTERVALS.out.annotated_intervals,
-        COLLECT_READ_COUNTS.out.counts.map { sample_id, hdf5 -> hdf5 }.collect()
+        sorted_counts_ch
     )
 
     // Step 6: Determine ploidy for the cohort
     DETERMINE_PLOIDY_COHORT(
         FILTER_INTERVALS.out.filtered_intervals,
-        COLLECT_READ_COUNTS.out.counts.map { sample_id, hdf5 -> hdf5 }.collect(),
+        sorted_counts_ch,
         GENERATE_PLOIDY_PRIORS.out.priors
     )
 
@@ -355,14 +372,16 @@ workflow GATK_GCNV {
     GERMLINE_CNV_CALLER_COHORT(
         shards_ch,
         ANNOTATE_INTERVALS.out.annotated_intervals,
-        COLLECT_READ_COUNTS.out.counts.map { sample_id, hdf5 -> hdf5 }.collect(),
+        sorted_counts_ch,
         DETERMINE_PLOIDY_COHORT.out.ploidy_calls
     )
 
-    // Step 9: Post-process calls into per-sample genotyped VCFs
+    // Step 9: Post-process calls into per-sample genotyped VCFs.
+    // Sample indices must be assigned in the same alphabetical order used when
+    // building counts_files.list for DetermineGermlineContigPloidy.
     indexed_samples_ch = bam_ch
         .map { sample_id, reads, index -> sample_id }
-        .toList()
+        .toSortedList()
         .flatMap { samples ->
             samples.withIndex().collect { sample, idx -> tuple(idx, sample) }
         }
@@ -375,7 +394,10 @@ workflow GATK_GCNV {
         dict_ch
     )
 
-    // Step 10: Compress, sort, index, and annotate each segments VCF with TOOL=GATK-gCNV
+    // Step 10: Compress, sort, index, and annotate each segments VCF with TOOL=GATK-gCNV.
+    // POSTPROCESS_CALLS now emits tuple(sample_id, vcf) so BGZIP_SORT_INDEX_VCF can
+    // embed the sample ID in the output filename using the _GCNV convention expected
+    // by gather_vcfs() in main.nf.
     BGZIP_SORT_INDEX_VCF(POSTPROCESS_CALLS.out.final_vcf)
 
     emit:

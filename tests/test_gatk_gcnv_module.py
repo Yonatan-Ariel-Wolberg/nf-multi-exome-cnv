@@ -1,0 +1,372 @@
+#!/usr/bin/env python3
+"""
+Tests for the GATK-gCNV Nextflow module (modules/modules-gatk-gcnv.nf).
+
+Validates that the module follows the GATK gCNV cohort-calling best practices
+for exome sequencing data:
+  1. Exome-appropriate default parameters (bin_length=0, padding=250).
+  2. DetermineGermlineContigPloidy uses --run-mode COHORT.
+  3. GermlineCNVCaller uses per-shard unique output prefixes derived from the
+     shard directory name (not the static "shard" prefix that caused staging
+     conflicts when shards were collected).
+  4. PostprocessGermlineCNVCalls receives shards sorted by name and uses Groovy
+     GString interpolation (${call_args} / ${model_args}), not escaped shell
+     variable references ($call_args / $model_args).
+  5. BGZIP_SORT_INDEX_VCF accepts a (sample_id, vcf) tuple and produces output
+     files named <sample_id>_GCNV_genotyped_segments.sorted.vcf.gz so that
+     gather_vcfs() in main.nf can extract the bare sample ID.
+  6. The GATK_GCNV workflow sorts counts by filename and sorted-lists the
+     sample index channel so that sample indices are deterministically assigned.
+"""
+
+import re
+import pytest
+
+
+NF_MODULE = "modules/modules-gatk-gcnv.nf"
+
+
+# ---------------------------------------------------------------------------
+# Helper
+# ---------------------------------------------------------------------------
+
+def _read_module(repo_root="."):
+    path = f"{repo_root}/{NF_MODULE}"
+    with open(path) as fh:
+        return fh.read()
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+def module_text():
+    import os
+    repo_root = os.path.join(os.path.dirname(__file__), "..")
+    return _read_module(repo_root)
+
+
+# ===========================================================================
+# 1. Default parameter values suitable for exome sequencing
+# ===========================================================================
+
+class TestDefaultParams:
+    """The module-level params block must reflect exome best-practice defaults."""
+
+    def test_bin_length_is_zero(self, module_text):
+        """bin_length must be 0 for exome (no binning; each target is its own interval)."""
+        match = re.search(r"bin_length\s*=\s*(\d+)", module_text)
+        assert match, "bin_length parameter not found in module"
+        assert match.group(1) == "0", (
+            f"bin_length should be 0 for exome data, got {match.group(1)}"
+        )
+
+    def test_padding_is_250(self, module_text):
+        """padding must be 250 bp per GATK gCNV exome best practice."""
+        match = re.search(r"padding\s*=\s*(\d+)", module_text)
+        assert match, "padding parameter not found in module"
+        assert match.group(1) == "250", (
+            f"padding should be 250 for exome data, got {match.group(1)}"
+        )
+
+    def test_scatter_count_is_5000(self, module_text):
+        """scatter_count (SCATTER_CONTENT) must match the JSON params default of 5000."""
+        match = re.search(r"scatter_count\s*=\s*(\d+)", module_text)
+        assert match, "scatter_count parameter not found in module"
+        assert match.group(1) == "5000", (
+            f"scatter_count should be 5000 (intervals per shard), got {match.group(1)}"
+        )
+
+    def test_is_wgs_is_false(self, module_text):
+        """is_wgs must be false (exome, not WGS)."""
+        match = re.search(r"is_wgs\s*=\s*(\S+)", module_text)
+        assert match, "is_wgs parameter not found in module"
+        assert match.group(1) == "false", (
+            f"is_wgs should be false for exome data, got {match.group(1)}"
+        )
+
+
+# ===========================================================================
+# 2. DetermineGermlineContigPloidy must use --run-mode COHORT
+# ===========================================================================
+
+class TestDetermineGermlineContigPloidy:
+    """DetermineGermlineContigPloidy must explicitly specify COHORT run mode."""
+
+    def test_run_mode_cohort_present(self, module_text):
+        """--run-mode COHORT must appear in the DetermineGermlineContigPloidy command."""
+        # Find the DETERMINE_PLOIDY_COHORT process block
+        proc_match = re.search(
+            r"process DETERMINE_PLOIDY_COHORT\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "DETERMINE_PLOIDY_COHORT process not found"
+        proc_body = proc_match.group(1)
+        assert "--run-mode COHORT" in proc_body, (
+            "DetermineGermlineContigPloidy must include --run-mode COHORT "
+            "for cohort-mode CNV calling"
+        )
+
+
+# ===========================================================================
+# 3. GermlineCNVCaller: unique per-shard output prefix
+# ===========================================================================
+
+class TestGermlineCNVCaller:
+    """GermlineCNVCaller must produce uniquely-named shard directories."""
+
+    def test_output_prefix_uses_shard_parent_name(self, module_text):
+        """The --output-prefix must be derived from interval_shard.parent.name,
+        not the static string 'shard' which caused all shards to collide."""
+        proc_match = re.search(
+            r"process GERMLINE_CNV_CALLER_COHORT\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "GERMLINE_CNV_CALLER_COHORT process not found"
+        proc_body = proc_match.group(1)
+        # The script must NOT use the static prefix "shard"
+        assert "--output-prefix shard" not in proc_body, (
+            "Static --output-prefix 'shard' causes all shard directories to have "
+            "the same name. Use interval_shard.parent.name instead."
+        )
+        # The output declarations must NOT use the static names 'shard-calls'/'shard-model'
+        output_section = re.search(
+            r"output:\s*(.+?)(?=\s*script:)", proc_body, re.DOTALL
+        )
+        assert output_section, "output section not found in GERMLINE_CNV_CALLER_COHORT"
+        out_text = output_section.group(1)
+        assert '"shard-calls"' not in out_text, (
+            "Static output path 'shard-calls' causes naming conflicts; "
+            "use a shard-specific prefix."
+        )
+        assert '"shard-model"' not in out_text, (
+            "Static output path 'shard-model' causes naming conflicts; "
+            "use a shard-specific prefix."
+        )
+
+    def test_output_uses_interval_shard_parent_name(self, module_text):
+        """Output paths must reference interval_shard.parent.name for unique naming."""
+        proc_match = re.search(
+            r"process GERMLINE_CNV_CALLER_COHORT\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "GERMLINE_CNV_CALLER_COHORT process not found"
+        proc_body = proc_match.group(1)
+        assert "interval_shard.parent.name" in proc_body, (
+            "Output prefix must be derived from interval_shard.parent.name "
+            "to guarantee unique shard directory names."
+        )
+
+
+# ===========================================================================
+# 4. PostprocessGermlineCNVCalls: correct Groovy interpolation and shard sorting
+# ===========================================================================
+
+class TestPostprocessCalls:
+    """POSTPROCESS_CALLS must pass shard args via Groovy interpolation, not shell vars."""
+
+    def test_no_escaped_dollar_call_args(self, module_text):
+        r"""'\$call_args' in the script block is a shell variable (always empty).
+        The correct form is '${call_args}' which uses Groovy GString interpolation."""
+        proc_match = re.search(
+            r"process POSTPROCESS_CALLS\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "POSTPROCESS_CALLS process not found"
+        proc_body = proc_match.group(1)
+        assert r"\$call_args" not in proc_body, (
+            r"'\$call_args' is an unset shell variable. "
+            "Use '${call_args}' for Groovy GString interpolation."
+        )
+
+    def test_no_escaped_dollar_model_args(self, module_text):
+        r"""'\$model_args' in the script block is a shell variable (always empty)."""
+        proc_match = re.search(
+            r"process POSTPROCESS_CALLS\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "POSTPROCESS_CALLS process not found"
+        proc_body = proc_match.group(1)
+        assert r"\$model_args" not in proc_body, (
+            r"'\$model_args' is an unset shell variable. "
+            "Use '${model_args}' for Groovy GString interpolation."
+        )
+
+    def test_call_args_groovy_interpolation(self, module_text):
+        """${call_args} must appear in the script heredoc for correct interpolation."""
+        proc_match = re.search(
+            r"process POSTPROCESS_CALLS\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "POSTPROCESS_CALLS process not found"
+        proc_body = proc_match.group(1)
+        assert "${call_args}" in proc_body, (
+            "${call_args} (Groovy interpolation) not found in POSTPROCESS_CALLS script"
+        )
+
+    def test_model_args_groovy_interpolation(self, module_text):
+        """${model_args} must appear in the script heredoc for correct interpolation."""
+        proc_match = re.search(
+            r"process POSTPROCESS_CALLS\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "POSTPROCESS_CALLS process not found"
+        proc_body = proc_match.group(1)
+        assert "${model_args}" in proc_body, (
+            "${model_args} (Groovy interpolation) not found in POSTPROCESS_CALLS script"
+        )
+
+    def test_shards_are_sorted(self, module_text):
+        """Shards must be sorted before building CLI args so genomic order is preserved."""
+        proc_match = re.search(
+            r"process POSTPROCESS_CALLS\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "POSTPROCESS_CALLS process not found"
+        proc_body = proc_match.group(1)
+        assert ".sort" in proc_body, (
+            "Call/model shards must be sorted by name before building "
+            "--calls-shard-path / --model-shard-path arguments so that "
+            "PostprocessGermlineCNVCalls receives them in correct genomic order."
+        )
+
+    def test_collect_closure_no_escaped_it(self, module_text):
+        r"""The collect closure must not use '\$it' which produces the literal
+        string '$it' rather than the Groovy closure variable value."""
+        proc_match = re.search(
+            r"process POSTPROCESS_CALLS\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "POSTPROCESS_CALLS process not found"
+        proc_body = proc_match.group(1)
+        assert r"\$it" not in proc_body, (
+            r"'\$it' in a collect closure produces the literal text '$it', not the "
+            "path value. Use an explicit variable name like '{ c -> \"...${c}\" }'."
+        )
+
+    def test_output_emits_tuple_with_sample_id(self, module_text):
+        """POSTPROCESS_CALLS final_vcf output must be a tuple(val(sample_id), path(...))
+        so that BGZIP_SORT_INDEX_VCF can name the file using the _GCNV convention."""
+        proc_match = re.search(
+            r"process POSTPROCESS_CALLS\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "POSTPROCESS_CALLS process not found"
+        # The output section
+        output_section = re.search(
+            r"output:\s*(.+?)(?=\s*script:)",
+            proc_match.group(1),
+            re.DOTALL,
+        )
+        assert output_section, "output section not found in POSTPROCESS_CALLS"
+        out_text = output_section.group(1)
+        # Must be a tuple emit for final_vcf
+        assert re.search(r"tuple\s+val\(sample_id\)", out_text), (
+            "POSTPROCESS_CALLS final_vcf must emit tuple(val(sample_id), path(...)) "
+            "so BGZIP_SORT_INDEX_VCF receives the sample ID for correct output naming."
+        )
+
+
+# ===========================================================================
+# 5. BGZIP_SORT_INDEX_VCF: correct input tuple and _GCNV naming
+# ===========================================================================
+
+class TestBgzipSortIndexVcf:
+    """BGZIP_SORT_INDEX_VCF must accept a tuple and produce _GCNV-tagged output."""
+
+    def test_input_is_tuple_with_sample_id(self, module_text):
+        """Input must be tuple(val(sample_id), path(vcf_file)) to receive sample ID."""
+        proc_match = re.search(
+            r"process BGZIP_SORT_INDEX_VCF\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "BGZIP_SORT_INDEX_VCF process not found"
+        proc_body = proc_match.group(1)
+        input_section = re.search(
+            r"input:\s*(.+?)(?=\s*output:)", proc_body, re.DOTALL
+        )
+        assert input_section, "input section not found in BGZIP_SORT_INDEX_VCF"
+        in_text = input_section.group(1)
+        assert re.search(r"tuple\s+val\(sample_id\)", in_text), (
+            "BGZIP_SORT_INDEX_VCF input must be tuple(val(sample_id), path(vcf_file))"
+        )
+
+    def test_output_filename_contains_gcnv_tag(self, module_text):
+        """Output filename must contain '_GCNV' so gather_vcfs() regex extracts
+        the correct sample ID when building consensus VCF inputs."""
+        proc_match = re.search(
+            r"process BGZIP_SORT_INDEX_VCF\s*\{(.+?)(?=\nprocess |\nworkflow )",
+            module_text,
+            re.DOTALL,
+        )
+        assert proc_match, "BGZIP_SORT_INDEX_VCF process not found"
+        proc_body = proc_match.group(1)
+        assert "_GCNV" in proc_body, (
+            "BGZIP_SORT_INDEX_VCF output filename must include '_GCNV' so that "
+            "gather_vcfs() regex '_(CANOES|...|GCNV|...).*' strips it correctly "
+            "and recovers the bare sample ID."
+        )
+
+
+# ===========================================================================
+# 6. Workflow: deterministic sample ordering
+# ===========================================================================
+
+class TestWorkflowOrdering:
+    """The GATK_GCNV workflow must sort counts and sample indices consistently."""
+
+    def test_counts_channel_is_sorted(self, module_text):
+        """Counts must be sorted by filename before being passed to
+        FilterIntervals / DetermineGermlineContigPloidy / GermlineCNVCaller."""
+        wf_match = re.search(
+            r"workflow GATK_GCNV\s*\{(.+)",
+            module_text,
+            re.DOTALL,
+        )
+        assert wf_match, "GATK_GCNV workflow not found"
+        wf_body = wf_match.group(1)
+        # toSortedList with a comparator based on file name
+        assert "toSortedList" in wf_body, (
+            "The GATK_GCNV workflow must sort the counts channel with toSortedList "
+            "so that FilterIntervals, DetermineGermlineContigPloidy, and "
+            "GermlineCNVCaller all receive count files in the same deterministic order."
+        )
+
+    def test_indexed_samples_channel_is_sorted(self, module_text):
+        """Sample indices must be assigned in alphabetical (sorted) order to match
+        the order used when building counts_files.list for DetermineGermlineContigPloidy."""
+        wf_match = re.search(
+            r"workflow GATK_GCNV\s*\{(.+)",
+            module_text,
+            re.DOTALL,
+        )
+        assert wf_match, "GATK_GCNV workflow not found"
+        wf_body = wf_match.group(1)
+        # The indexed_samples_ch construction must use toSortedList (not just toList)
+        assert "toSortedList" in wf_body, (
+            "indexed_samples_ch must use toSortedList() so sample indices match "
+            "the sorted order of count files passed to DetermineGermlineContigPloidy."
+        )
+        # Specifically for the indexed_samples_ch block, toList() must not be used
+        idx_block = re.search(
+            r"indexed_samples_ch\s*=\s*bam_ch(.+?)indexed_samples_ch\b",
+            wf_body,
+            re.DOTALL,
+        )
+        if idx_block:
+            assert ".toList()" not in idx_block.group(1), (
+                "Replace .toList() with .toSortedList() for the indexed samples channel "
+                "to guarantee consistent sample indexing."
+            )

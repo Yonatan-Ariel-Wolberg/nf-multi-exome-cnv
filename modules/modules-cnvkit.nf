@@ -114,13 +114,14 @@ process CALL_CNV {
     path reference
     
     output: 
-    tuple val(sample_id), path("${sample_id}.cnr"), path("${sample_id}.cns"), emit: results
+    tuple val(sample_id), path("${sample_id}.cnr"), path("${sample_id}.cns"), path("${sample_id}.call.cns"), emit: results
     path "*.pdf"
     
     script:
     """
     cnvkit.py fix $t_cov $t_anticov $reference -o ${sample_id}.cnr
     cnvkit.py segment ${sample_id}.cnr -o ${sample_id}.cns
+    cnvkit.py call ${sample_id}.cns -o ${sample_id}.call.cns
     cnvkit.py scatter ${sample_id}.cnr -s ${sample_id}.cns -o ${sample_id}-scatter.pdf
     cnvkit.py diagram ${sample_id}.cnr -s ${sample_id}.cns -o ${sample_id}-diagram.pdf
     """
@@ -132,7 +133,7 @@ process EXPORT_RESULTS {
     publishDir "${outdir}/out_CNVKIT/vcfs", mode: 'copy', overwrite: true
     
     input: 
-    tuple val(sample_id), path(cnr), path(cns)
+    tuple val(sample_id), path(cnr), path(cns), path(call_cns)
     
     output: 
     path("${sample_id}_CNVKIT_output.vcf"), emit: vcf
@@ -141,8 +142,8 @@ process EXPORT_RESULTS {
     script:
     """
     # Using specific naming convention so it routes cleanly into the consensus modules
-    cnvkit.py export vcf $cns -i $sample_id -o ${sample_id}_CNVKIT_output.vcf
-    cnvkit.py export bed $cns -i $sample_id -o ${sample_id}_calls.bed
+    cnvkit.py export vcf $call_cns -i $sample_id -o ${sample_id}_CNVKIT_output.vcf
+    cnvkit.py export bed $call_cns -i $sample_id -o ${sample_id}_calls.bed
     """
 }
 

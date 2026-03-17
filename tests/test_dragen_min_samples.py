@@ -175,6 +175,26 @@ class TestInRunPonParameter:
         )
 
 
+class TestQcCoverageFilters:
+    """The qc_coverage_filters parameter must use mapq<20,bq<20."""
+
+    def test_qc_coverage_filters_value(self):
+        """START_ANALYSIS_BATCH must pass qc_coverage_filters with mapq<20,bq<20."""
+        content = _load_module()
+        assert "qc_coverage_filters:\"'mapq<20,bq<20'\"" in content, (
+            "modules-icav2-dragen.nf must include "
+            "--parameters qc_coverage_filters:\"'mapq<20,bq<20'\" "
+            "for DRAGEN germline enrichment pipeline QC."
+        )
+
+    def test_qc_coverage_filters_not_old_value(self):
+        """The old mapq<1 value must not be present."""
+        content = _load_module()
+        assert "mapq<1'" not in content, (
+            "The old qc_coverage_filters value 'mapq<1' must be replaced with 'mapq<20,bq<20'."
+        )
+
+
 class TestMinSampleBashLogic:
     """Unit-test the bash validation logic extracted from START_ANALYSIS_BATCH."""
 

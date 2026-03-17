@@ -90,7 +90,6 @@ process COLLAPSE_VCFS {
         --sizemin 50 \\
         --sizemax 2000000 \\
         --fast-cluster \\
-        --summary \\
         -i "${merged_vcf}" \\
         -o "${sample_id}_truvari_merged.vcf" \\
         -c "${sample_id}_truvari_collapsed.vcf"

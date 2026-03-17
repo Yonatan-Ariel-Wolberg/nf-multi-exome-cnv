@@ -273,7 +273,7 @@ workflow INDELIBLE {
     // Step 10: Convert filtered TSV to VCF
     CONVERT_INDELIBLE_TO_VCF(FILTER_INDELIBLE.out.filtered_cnvs)
 
-    // Step 11: Compress, sort, index, and annotate each VCF with TOOL=INDELIBLE
+    // Step 11: bgzip-compress, coordinate-sort, and tabix-index each per-sample VCF
     BGZIP_SORT_INDEX_VCF(CONVERT_INDELIBLE_TO_VCF.out.vcfs)
 
     emit:

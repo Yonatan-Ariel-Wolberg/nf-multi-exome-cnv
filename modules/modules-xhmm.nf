@@ -107,7 +107,7 @@ process CALC_GC_XHMM {
         --interval-merging-rule OVERLAPPING_ONLY \
         -O gc.tmp
 
-    grep "^chr" gc.tmp | awk '{ print \$1":"\$2"-"\$3"\t"\$4 }' > DATA.locus_GC.txt
+    grep -v "^@" gc.tmp | grep -v "^CONTIG" | awk '{ print \$1":"\$2"-"\$3"\t"\$4 }' > DATA.locus_GC.txt
     cat DATA.locus_GC.txt | awk '{ if (\$2 < 0.1 || \$2 > 0.9) print \$1 }' > extreme_gc_targets.txt
     """
 }
@@ -289,15 +289,18 @@ process SPLIT_VCF {
     path(vcf_file)
     
     output:
-    path("*_DATA.vcf"), emit: individual_vcfs
+    path("*_XHMM_output.vcf"), emit: individual_vcfs
     
     script:
     """
-    # Use bcftools to split the VCF file by sample while excluding placeholders
+    # Split the multi-sample VCF by sample, keeping only variants actually
+    # called for each sample (GT != ref and GT != missing), and ensure the
+    # CHROM column carries the 'chr' prefix required by downstream tools.
     for sample in \$(bcftools query -l ${vcf_file}); do
         bcftools view -s \${sample} ${vcf_file} | \
-        # Filter out placeholders and keep only variants called for that sample
-        bcftools filter -e 'FORMAT/EQ="." || FORMAT/SQ="." || FORMAT/NDQ="."' -o \${sample}_DATA.vcf
+        bcftools view -i 'GT!="." && GT!="0"' | \
+        awk 'BEGIN{OFS="\t"} /^#/{print; next} {if (\$1 !~ /^chr/) \$1="chr"\$1; print}' \
+        > \${sample}_XHMM_output.vcf
     done
     """
 }

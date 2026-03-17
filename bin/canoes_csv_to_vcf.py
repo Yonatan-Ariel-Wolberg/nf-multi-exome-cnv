@@ -67,7 +67,7 @@ def convert_canoes_csv_to_dict(input_file, sample_file, log_file=None):
 
     try:
         with open(input_file, 'r') as csvfile:
-            reader = csv.DictReader(csvfile, delimiter=',')  # Adjusted delimiter if necessary
+            reader = csv.DictReader(csvfile, delimiter='\t')
             for row in reader:
                 if row['SAMPLE'] in sample_list:
                     mutation = {

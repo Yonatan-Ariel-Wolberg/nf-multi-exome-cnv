@@ -66,12 +66,20 @@ def _read_vcf_records(vcf_path):
 
 @pytest.fixture()
 def canoes_csv(tmp_path):
-    """Minimal CANOES CSV with one call per sample."""
+    """Minimal CANOES TSV with one call per sample.
+
+    Uses the actual tab-separated output format produced by run_canoes.R /
+    CANOES.R (write.table with sep='\t'), with the column order that
+    PrintCNVs / CalcCopyNumber generates:
+      SAMPLE, CNV, INTERVAL, KB, CHR, MID_BP, TARGETS, NUM_TARG, MLCN, Q_SOME
+    INTERVAL uses integer chromosome numbers (no 'chr' prefix) because
+    RUN_CANOES strips the prefix with sed before invoking the R script.
+    """
     csv = tmp_path / "canoes.csv"
     csv.write_text(
-        "CNV,INTERVAL,KB,CHR,MID_BP,TARGETS,NUM_TARG,SAMPLE,MLCN,Q_SOME\n"
-        "DEL,chr1:1000-2000,1.0,1,1500,GENE1:1000-2000,2,SAMPLE1,1,90.5\n"
-        "DUP,chr2:5000-8000,3.0,2,6500,GENE2:5000-8000,3,SAMPLE2,3,75.2\n"
+        "SAMPLE\tCNV\tINTERVAL\tKB\tCHR\tMID_BP\tTARGETS\tNUM_TARG\tMLCN\tQ_SOME\n"
+        "SAMPLE1\tDEL\t1:1000-2000\t1.0\t1\t1500\t1..2\t2\t1\t90.5\n"
+        "SAMPLE2\tDUP\t2:5000-8000\t3.0\t2\t6500\t3..5\t3\t3\t75.2\n"
     )
     return str(csv)
 

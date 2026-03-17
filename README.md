@@ -4,25 +4,25 @@ A Nextflow pipeline for comprehensive genomic analysis combining multiple varian
 
 ## Tools
 
-**CANOES**: https://github.com/ShenLab/CANOES
+**CANOES**: [GitHub](https://github.com/ShenLab/CANOES)
 
-**CLAMMS**: https://github.com/rgcgithub/clamms
+**CLAMMS**: [GitHub](https://github.com/rgcgithub/clamms)
 
-**XHMM**: https://github.com/RRafiee/XHMM
+**XHMM**: [GitHub](https://github.com/RRafiee/XHMM)
 
-**InDelible**: https://github.com/HurlesGroupSanger/indelible
+**InDelible**: [GitHub](https://github.com/HurlesGroupSanger/indelible)
 
-**ICAv2**: https://help.ica.illumina.com/command-line-interface/cli-indexcommands
+**ICAv2**: [ICAv2 Commands](https://help.ica.illumina.com/command-line-interface/cli-indexcommands)
 
-**Illumina's DRAGEN Germline Enrichment**: https://www.illumina.com/products/by-type/informatics-products/basespace-sequence-hub/apps/dragen-enrichment.html
+**Illumina's DRAGEN Germline Enrichment**: [Description of DRAGEN Enrichment](https://www.illumina.com/products/by-type/informatics-products/basespace-sequence-hub/apps/dragen-enrichment.html)
 
-**The Broad Institute's GATK-gCNV**: https://github.com/broadinstitute/gatk
+**The Broad Institute's GATK-gCNV**: [GitHub](https://github.com/broadinstitute/gatk)
 
-**CNVkit**: https://github.com/etal/cnvkit
+**CNVkit**: [GitHub](https://github.com/etal/cnvkit)
 
-**Truvari**: https://github.com/ACEnglish/truvari
+**Truvari**: [GitHub](https://github.com/ACEnglish/truvari)
 
-**SURVIVOR**: https://github.com/fritzsedlazeck/SURVIVOR
+**SURVIVOR**: [GitHub](https://github.com/fritzsedlazeck/SURVIVOR)
 
 ## Overview
 

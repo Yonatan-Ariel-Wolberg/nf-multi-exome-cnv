@@ -4,25 +4,25 @@ A Nextflow pipeline for comprehensive genomic analysis combining multiple varian
 
 ## Tools
 
-**CANOES**: [GitHub](https://github.com/ShenLab/CANOES)
+**CANOES**: [GitHub](https://github.com/ShenLab/CANOES); [DOI](https://doi.org/10.1093/nar/gku345)
 
-**CLAMMS**: [GitHub](https://github.com/rgcgithub/clamms)
+**CLAMMS**: [GitHub](https://github.com/rgcgithub/clamms); [DOI](https://doi.org/10.1093/bioinformatics/btv547)
 
-**XHMM**: [GitHub](https://github.com/RRafiee/XHMM)
+**XHMM**: [GitHub](https://github.com/RRafiee/XHMM); [DOI](https://doi.org/10.1002/0471142905.hg0723s81)
 
-**InDelible**: [GitHub](https://github.com/HurlesGroupSanger/indelible)
+**InDelible**: [GitHub](https://github.com/HurlesGroupSanger/indelible); [DOI](https://doi.org/10.1016/j.ajhg.2021.09.010)
 
-**ICAv2**: [ICAv2 Commands](https://help.ica.illumina.com/command-line-interface/cli-indexcommands)
+**ICAv2**: [GitHub](https://github.com/umccr/illumination/tree/v2); [ICAv2 Commands](https://help.ica.illumina.com/command-line-interface/cli-indexcommands)
 
-**Illumina's DRAGEN Germline Enrichment**: [Description of DRAGEN Enrichment](https://www.illumina.com/products/by-type/informatics-products/basespace-sequence-hub/apps/dragen-enrichment.html)
+**Illumina's DRAGEN Germline Enrichment**: [Description of DRAGEN Enrichment](https://www.illumina.com/products/by-type/informatics-products/basespace-sequence-hub/apps/dragen-enrichment.html); [DOI](https://doi.org/10.1038/s41587-024-02382-1)
 
-**The Broad Institute's GATK-gCNV**: [GitHub](https://github.com/broadinstitute/gatk)
+**The Broad Institute's GATK-gCNV**: [GitHub](https://github.com/broadinstitute/gatk); [DOI](https://doi.org/10.1038/s41588-023-01449-0)
 
-**CNVkit**: [GitHub](https://github.com/etal/cnvkit)
+**CNVkit**: [GitHub](https://github.com/etal/cnvkit); [DOI](https://doi.org/10.1371/journal.pcbi.1004873)
 
-**Truvari**: [GitHub](https://github.com/ACEnglish/truvari)
+**Truvari**: [GitHub](https://github.com/ACEnglish/truvari); [DOI](https://doi.org/10.1186/s13059-022-02840-6)
 
-**SURVIVOR**: [GitHub](https://github.com/fritzsedlazeck/SURVIVOR)
+**SURVIVOR**: [GitHub](https://github.com/fritzsedlazeck/SURVIVOR); [DOI](https://doi.org/10.1038/ncomms14061)
 
 ## Overview
 
@@ -49,8 +49,8 @@ Built with Nextflow for reproducible, scalable, and portable data analysis.
 
 ### Software
 - **Apptainer** (formerly Singularity): >= 1.0  
-  All tool containers are pulled and executed via Apptainer. Install it following the [official guide](https://apptainer.org/docs/admin/main/installation.html).
-- **Nextflow**: >= 20.04  
+  All tool containers are pulled and executed via Apptainer. Install it following the [official guide](https://apptainer.org/docs/admin/main/installation.html). ([DOI](https://doi.org/10.1371/journal.pone.0177459))
+- **Nextflow**: >= 20.04  ([DOI](https://doi.org/10.1038/nbt.3820))
   Install with:
   ```bash
   curl -s https://get.nextflow.io | bash

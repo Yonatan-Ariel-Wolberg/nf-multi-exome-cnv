@@ -5,12 +5,14 @@ Tests for bin/feature_extraction.py.
 Validates:
   1. Module-level structure: imports, public API, module docstring.
   2. Helper functions: _load_bed, _count_probes, _mean_mappability,
-     _load_mappability_bed, _gc_content, _rd_ratio, _get_raw_qual.
+     _load_mappability_bed, _gc_content, _rd_ratio.
   3. extract_normalized_features: signature has required optional parameters
      (bed_file, bam_file, reference_fasta, mappability_file, rd_flank),
      produces expected columns, and handles missing optional inputs.
   4. QUAL_norm is read from the per-caller VCF QUAL field (not recomputed).
-  5. Raw quality fields per caller map to the correct FORMAT/INFO sources.
+     Raw caller-native scores (Q_SOME, SQ, QS, CNQ, native QUAL, synthetic
+     INDELIBLE Phred) are already the direct input to QUAL_norm and are
+     therefore NOT stored as separate columns.
 
 Where full VCF/BAM/FASTA fixtures are impractical, the tests import the
 helper functions directly and exercise them with in-memory data.
@@ -160,59 +162,15 @@ class TestQualNormSourcing:
             "feature_extraction must store qual_norm_{caller} columns"
         )
 
-    def test_stores_raw_qual_per_caller(self, script_text):
-        assert "raw_qual_" in script_text, (
-            "feature_extraction must store raw_qual_{caller} columns for "
-            "the non-redundant caller-native quality metric"
+    def test_no_raw_qual_per_caller(self, script_text):
+        assert "raw_qual_" not in script_text, (
+            "raw_qual_{caller} columns must be absent: the caller-native "
+            "scores are already the input to QUAL_norm and are redundant"
         )
 
-
-# ===========================================================================
-# 4. Raw quality field mapping correctness
-# ===========================================================================
-
-class TestRawQualMapping:
-    """_get_raw_qual must map each caller to the correct FORMAT/INFO field."""
-
-    def test_canoes_uses_q_some(self, script_text):
-        # Find the _get_raw_qual function block
-        assert "'canoes'" in script_text and "'Q_SOME'" in script_text, (
-            "CANOES raw quality must be extracted from Q_SOME FORMAT field"
-        )
-
-    def test_clamms_uses_q_some(self, script_text):
-        assert "'clamms'" in script_text and "'Q_SOME'" in script_text
-
-    def test_xhmm_uses_sq(self, script_text):
-        assert "'xhmm'" in script_text and "'SQ'" in script_text, (
-            "XHMM raw quality must be extracted from SQ FORMAT field"
-        )
-
-    def test_gatk_uses_qs(self, script_text):
-        assert "'gatk'" in script_text and "'QS'" in script_text, (
-            "GATK-gCNV raw quality must be extracted from QS FORMAT field"
-        )
-
-    def test_cnvkit_uses_cnq(self, script_text):
-        assert "'cnvkit'" in script_text and "'CNQ'" in script_text, (
-            "CNVkit raw quality must be extracted from CNQ FORMAT field"
-        )
-
-    def test_dragen_uses_oq(self, script_text):
-        assert "'dragen'" in script_text and "'OQ'" in script_text, (
-            "DRAGEN raw quality must be read from OQ FORMAT field "
-            "(original QUAL stored by normalise_cnv_caller_quality_scores.py)"
-        )
-
-    def test_indelible_uses_sr_total_and_avg_mapq(self, script_text):
-        assert "'SR_TOTAL'" in script_text and "'AVG_MAPQ'" in script_text, (
-            "INDELIBLE raw quality must be computed from SR_TOTAL and AVG_MAPQ INFO fields"
-        )
-
-    def test_indelible_synthetic_formula(self, script_text):
-        # The formula: sr_total * (avg_mapq / 60.0) * 100.0
-        assert '60.0' in script_text and '100.0' in script_text, (
-            "INDELIBLE synthetic Phred formula must include / 60.0 and * 100.0"
+    def test_no_get_raw_qual_function(self, script_text):
+        assert "def _get_raw_qual(" not in script_text, (
+            "_get_raw_qual helper must be removed along with raw_qual columns"
         )
 
 
@@ -412,111 +370,7 @@ class TestRdRatio:
 
 
 # ===========================================================================
-# 9. _get_raw_qual unit tests
-# ===========================================================================
-
-class TestGetRawQual:
-    """_get_raw_qual must return the correct metric name and value per caller."""
-
-    def _make_record(self, info=None, format_vals=None):
-        """Create a minimal mock VariantRecord."""
-        mock = types.SimpleNamespace()
-        mock.info = info or {}
-        mock.qual = None
-        # Build a mock sample
-        sample = types.SimpleNamespace()
-        sample_dict = format_vals or {}
-
-        class MockSample:
-            def __contains__(self, key):
-                return key in sample_dict
-            def __getitem__(self, key):
-                return sample_dict[key]
-
-        mock.samples = types.SimpleNamespace()
-        mock.samples.values = lambda: [MockSample()]
-        return mock
-
-    def test_canoes_q_some(self, fe):
-        record = self._make_record(format_vals={'Q_SOME': 75.0})
-        name, val = fe._get_raw_qual(record, 'canoes')
-        assert name == 'Q_SOME'
-        assert val == pytest.approx(75.0)
-
-    def test_clamms_q_some(self, fe):
-        record = self._make_record(format_vals={'Q_SOME': 120.0})
-        name, val = fe._get_raw_qual(record, 'clamms')
-        assert name == 'Q_SOME'
-        assert val == pytest.approx(120.0)
-
-    def test_xhmm_sq(self, fe):
-        record = self._make_record(format_vals={'SQ': 55.0})
-        name, val = fe._get_raw_qual(record, 'xhmm')
-        assert name == 'SQ'
-        assert val == pytest.approx(55.0)
-
-    def test_gatk_qs(self, fe):
-        record = self._make_record(format_vals={'QS': 200.0})
-        name, val = fe._get_raw_qual(record, 'gatk')
-        assert name == 'QS'
-        assert val == pytest.approx(200.0)
-
-    def test_cnvkit_cnq(self, fe):
-        record = self._make_record(format_vals={'CNQ': 30.0})
-        name, val = fe._get_raw_qual(record, 'cnvkit')
-        assert name == 'CNQ'
-        assert val == pytest.approx(30.0)
-
-    def test_dragen_oq(self, fe):
-        record = self._make_record(format_vals={'OQ': 45.0})
-        name, val = fe._get_raw_qual(record, 'dragen')
-        assert name == 'QUAL'
-        assert val == pytest.approx(45.0)
-
-    def test_indelible_synthetic_phred(self, fe):
-        # sr_total * (avg_mapq / 60) * 100 = 10 * (30/60) * 100 = 500
-        record = self._make_record(info={'SR_TOTAL': 10.0, 'AVG_MAPQ': 30.0})
-        name, val = fe._get_raw_qual(record, 'indelible')
-        assert name == 'SYNTHETIC_PHRED'
-        assert val == pytest.approx(500.0)
-
-    def test_indelible_zero_sr_total(self, fe):
-        """SR_TOTAL=0 should produce synthetic score of 0.0."""
-        record = self._make_record(info={'SR_TOTAL': 0.0, 'AVG_MAPQ': 40.0})
-        name, val = fe._get_raw_qual(record, 'indelible')
-        assert name == 'SYNTHETIC_PHRED'
-        assert val == pytest.approx(0.0)
-
-    def test_indelible_zero_avg_mapq(self, fe):
-        """AVG_MAPQ=0 should produce synthetic score of 0.0."""
-        record = self._make_record(info={'SR_TOTAL': 5.0, 'AVG_MAPQ': 0.0})
-        name, val = fe._get_raw_qual(record, 'indelible')
-        assert name == 'SYNTHETIC_PHRED'
-        assert val == pytest.approx(0.0)
-
-    def test_indelible_missing_sr_total_returns_nan(self, fe):
-        """Missing SR_TOTAL must return NaN."""
-        record = self._make_record(info={'AVG_MAPQ': 40.0})  # no SR_TOTAL
-        name, val = fe._get_raw_qual(record, 'indelible')
-        assert name is None
-        assert math.isnan(val)
-
-    def test_indelible_missing_avg_mapq_returns_nan(self, fe):
-        """Missing AVG_MAPQ must return NaN."""
-        record = self._make_record(info={'SR_TOTAL': 5.0})  # no AVG_MAPQ
-        name, val = fe._get_raw_qual(record, 'indelible')
-        assert name is None
-        assert math.isnan(val)
-
-    def test_missing_field_returns_nan(self, fe):
-        record = self._make_record(format_vals={})  # no Q_SOME
-        name, val = fe._get_raw_qual(record, 'canoes')
-        assert name is None
-        assert math.isnan(val)
-
-
-# ===========================================================================
-# 10. Concordance and caller flags
+# 9. Concordance and caller flags
 # ===========================================================================
 
 class TestConcordanceAndFlags:

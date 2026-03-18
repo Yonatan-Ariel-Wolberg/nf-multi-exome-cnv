@@ -31,11 +31,11 @@ Per-caller flags  (CN-Learn: caller_list binary indicators)
 
 Per-caller quality scores  (absent in CN-Learn; added because QUAL_norm makes
     cross-caller quality directly comparable)
-    qual_norm_{caller}   -- QUAL_norm score from the normalised VCF QUAL field
-    raw_qual_{caller}    -- caller-native raw quality metric (non-redundant
-                           with QUAL_norm): Q_SOME (CANOES/CLAMMS), SQ (XHMM),
-                           QS (GATK-gCNV), CNQ (CNVkit), original QUAL (DRAGEN),
-                           synthetic Phred score (INDELIBLE).
+    qual_norm_{caller}   -- QUAL_norm score from the normalised VCF QUAL field.
+                           This is the *only* per-caller quality column: the
+                           caller-native raw scores (Q_SOME, SQ, QS, CNQ, native
+                           QUAL, synthetic INDELIBLE Phred) are already the direct
+                           input to QUAL_norm and are therefore redundant.
 
 Aggregate quality summaries  (complements per-caller columns)
     max_qual_norm           -- maximum QUAL_norm across all supporting callers
@@ -240,60 +240,6 @@ def _mean_mappability(chrom, start, end, mappability_intervals):
     return weighted_sum / total_bases
 
 
-# ── Per-caller raw quality extractor ─────────────────────────────────────────
-
-def _get_raw_qual(record, caller):
-    """Extract the caller-native quality metric from a (normalised) VCF record.
-
-    Normalised VCFs produced by ``normalise_cnv_caller_quality_scores.py``
-    retain all original FORMAT/INFO fields, so the raw scores are still
-    accessible alongside the new QUAL_norm value in the QUAL column.
-
-    Returns (metric_name: str, value: float) or (None, np.nan) if unavailable.
-
-    Caller mappings
-    ---------------
-    canoes    -- Q_SOME FORMAT field
-    clamms    -- Q_SOME FORMAT field
-    xhmm      -- SQ FORMAT field
-    gatk      -- QS FORMAT field
-    cnvkit    -- CNQ FORMAT field
-    dragen    -- original QUAL preserved in OQ FORMAT field by normalisation
-    indelible -- synthetic Phred = SR_TOTAL * (AVG_MAPQ / 60.0) * 100  (INFO)
-    """
-    sample = next(iter(record.samples.values()), None)
-    try:
-        if caller == 'canoes':
-            if sample is not None and 'Q_SOME' in sample:
-                return 'Q_SOME', float(sample['Q_SOME'])
-        elif caller == 'clamms':
-            if sample is not None and 'Q_SOME' in sample:
-                return 'Q_SOME', float(sample['Q_SOME'])
-        elif caller == 'xhmm':
-            if sample is not None and 'SQ' in sample:
-                return 'SQ', float(sample['SQ'])
-        elif caller == 'gatk':
-            if sample is not None and 'QS' in sample:
-                return 'QS', float(sample['QS'])
-        elif caller == 'cnvkit':
-            if sample is not None and 'CNQ' in sample:
-                return 'CNQ', float(sample['CNQ'])
-        elif caller == 'dragen':
-            # After normalisation the original QUAL is stored in OQ FORMAT field.
-            if sample is not None and 'OQ' in sample:
-                return 'QUAL', float(sample['OQ'])
-        elif caller == 'indelible':
-            # Reconstruct the synthetic score used as the QUAL_norm input.
-            if 'SR_TOTAL' in record.info and 'AVG_MAPQ' in record.info:
-                sr_total = float(record.info['SR_TOTAL'])
-                avg_mapq = float(record.info['AVG_MAPQ'])
-                synthetic = sr_total * (avg_mapq / 60.0) * 100.0
-                return 'SYNTHETIC_PHRED', synthetic
-    except (ValueError, TypeError):
-        pass
-    return None, np.nan
-
-
 # ── Main extraction function ──────────────────────────────────────────────────
 
 def extract_normalized_features(
@@ -426,9 +372,6 @@ def extract_normalized_features(
                         v_data[f'qual_norm_{caller_name}'] = (
                             orig.qual if orig.qual is not None else np.nan
                         )
-                        # Raw (non-redundant) caller-native quality metric
-                        _, raw_val = _get_raw_qual(orig, caller_name)
-                        v_data[f'raw_qual_{caller_name}'] = raw_val
 
                         # Caller-specific secondary INFO metrics
                         if caller_name == 'xhmm' and 'RD' in orig.info:
@@ -445,10 +388,8 @@ def extract_normalized_features(
                                 v_data['dragen_sd'] = orig.info['SD']
                     else:
                         v_data[f'qual_norm_{caller_name}'] = np.nan
-                        v_data[f'raw_qual_{caller_name}'] = np.nan
                 else:
                     v_data[f'qual_norm_{caller_name}'] = np.nan
-                    v_data[f'raw_qual_{caller_name}'] = np.nan
 
         elif merger_mode == 'truvari':
             var_id = str(record.id) if record.id else ''
@@ -467,8 +408,6 @@ def extract_normalized_features(
                         v_data[f'qual_norm_{caller_name}'] = (
                             orig.qual if orig.qual is not None else np.nan
                         )
-                        _, raw_val = _get_raw_qual(orig, caller_name)
-                        v_data[f'raw_qual_{caller_name}'] = raw_val
 
                         if caller_name == 'xhmm' and 'RD' in orig.info:
                             v_data['xhmm_rd'] = orig.info['RD']
@@ -484,10 +423,8 @@ def extract_normalized_features(
                                 v_data['dragen_sd'] = orig.info['SD']
                     else:
                         v_data[f'qual_norm_{caller_name}'] = np.nan
-                        v_data[f'raw_qual_{caller_name}'] = np.nan
                 else:
                     v_data[f'qual_norm_{caller_name}'] = np.nan
-                    v_data[f'raw_qual_{caller_name}'] = np.nan
 
         # ── aggregate quality summaries across all supporting callers ─────
         # Inspired by CN-Learn's per-caller binary flags but enriched with

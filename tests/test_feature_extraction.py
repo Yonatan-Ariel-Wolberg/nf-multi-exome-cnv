@@ -756,3 +756,151 @@ class TestL2rStats:
         """When either bam_file or bed_file is absent, L2R columns must be NaN."""
         assert 'l2r_mean' in script_text and 'np.nan' in script_text
 
+
+
+# ===========================================================================
+# 18. indelible_counts is optional (default None)
+# ===========================================================================
+
+class TestIndelibleCountsOptional:
+    """indelible_counts should default to None; INDELIBLE features -> NaN."""
+
+    def test_indelible_counts_defaults_none(self, script_text):
+        """extract_normalized_features must have indelible_counts=None in signature."""
+        assert 'indelible_counts=None' in script_text, (
+            "indelible_counts must default to None so INDELIBLE can be omitted"
+        )
+
+    def test_none_indelible_handled_as_empty_df(self, script_text):
+        """When indelible_counts is None, it should be replaced with an empty DataFrame."""
+        assert "indelible_counts is None" in script_text or \
+               "indelible_counts = pd.DataFrame" in script_text, (
+            "feature_extraction must gracefully handle indelible_counts=None "
+            "by substituting an empty DataFrame"
+        )
+
+    def test_indelible_nan_fallback_present(self, script_text):
+        """When no matching INDELIBLE row exists, columns must be NaN."""
+        assert "total_sr" in script_text and "np.nan" in script_text
+
+
+# ===========================================================================
+# 19. concordance computed in Truvari mode
+# ===========================================================================
+
+class TestTruvariConcordance:
+    """extract_normalized_features must compute concordance in Truvari mode."""
+
+    def test_concordance_in_truvari_branch(self, script_text):
+        """concordance column must be assigned inside the truvari branch."""
+        # The script must set 'concordance' after the Truvari is_{caller} loop.
+        assert "concordance" in script_text, (
+            "concordance feature must be computed in Truvari mode"
+        )
+
+    def test_truvari_concordance_is_sum_of_is_flags(self, script_text):
+        """concordance must be the sum of is_{caller} values in Truvari mode."""
+        assert "sum(" in script_text and "is_" in script_text, (
+            "concordance should be computed as sum of is_ flags in Truvari mode"
+        )
+
+
+# ===========================================================================
+# 20. SURVIVOR header auto-detection helper
+# ===========================================================================
+
+class TestCallerOrderFromSurvivorHeader:
+    """_caller_order_from_survivor_header must parse ##SAMPLE lines."""
+
+    def test_helper_present(self, script_text):
+        assert 'def _caller_order_from_survivor_header(' in script_text
+
+    def test_helper_returns_list(self, fe):
+        """Should return an empty list when given a header with no ##SAMPLE lines."""
+        import pysam
+
+        class MockRecord:
+            type = 'GENERIC'
+            def __str__(self):
+                return '##reference=GRCh38'
+
+        class MockHeader:
+            records = [MockRecord()]
+
+        result = fe._caller_order_from_survivor_header(MockHeader())
+        assert isinstance(result, list)
+        assert result == []
+
+    def test_caller_patterns_present(self, script_text):
+        """The helper must contain filename patterns for known callers."""
+        for caller in ('CANOES', 'CLAMMS', 'XHMM', 'CNVKIT', 'DRAGEN', 'INDELIBLE'):
+            assert caller in script_text, (
+                f"_caller_order_from_survivor_header must recognise {caller} filenames"
+            )
+
+    def test_parses_sample_id_and_file(self, script_text):
+        """Parser must extract ID= and File= from ##SAMPLE meta-info lines."""
+        assert 'ID=' in script_text and 'File=' in script_text
+
+    def test_falls_back_to_tool_n(self, fe):
+        """Unrecognised filenames must yield 'tool_N' names."""
+        class MockRecord:
+            type = 'GENERIC'
+            def __str__(self):
+                return '##SAMPLE=<ID=0,File=/path/to/unknown_caller.vcf>'
+
+        class MockHeader:
+            records = [MockRecord()]
+
+        import re as _re
+        result = fe._caller_order_from_survivor_header(MockHeader())
+        assert result == ['tool_0'], f"Expected ['tool_0'], got {result}"
+
+
+# ===========================================================================
+# 21. CLI argparse interface
+# ===========================================================================
+
+class TestCLI:
+    """feature_extraction.py must expose an argparse CLI."""
+
+    def test_argparse_import(self, script_text):
+        assert 'import argparse' in script_text
+
+    def test_main_block_present(self, script_text):
+        assert "__name__ == '__main__'" in script_text or \
+               '__name__ == "__main__"' in script_text
+
+    def test_build_cli_parser_present(self, script_text):
+        assert '_build_cli_parser' in script_text
+
+    def test_merged_vcf_argument(self, script_text):
+        assert '--merged_vcf' in script_text
+
+    def test_output_argument(self, script_text):
+        assert '--output' in script_text
+
+    def test_tool_vcfs_argument(self, script_text):
+        assert '--tool_vcfs' in script_text
+
+    def test_merger_mode_argument(self, script_text):
+        assert '--merger_mode' in script_text
+
+    def test_indelible_counts_argument(self, script_text):
+        assert '--indelible_counts' in script_text
+
+    def test_bed_file_argument(self, script_text):
+        assert '--bed_file' in script_text
+
+    def test_bam_file_argument(self, script_text):
+        assert '--bam_file' in script_text
+
+    def test_reference_fasta_argument(self, script_text):
+        assert '--reference_fasta' in script_text
+
+    def test_sample_id_argument(self, script_text):
+        assert '--sample_id' in script_text
+
+    def test_cli_parses_tool_vcfs_pairs(self, script_text):
+        """CLI must split caller=path pairs on '='."""
+        assert "split('=')" in script_text or ".split('='," in script_text

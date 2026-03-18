@@ -18,6 +18,31 @@ Feature design is informed by:
     (flanking probe count) and L2R features from that paper are implemented
     here as n_probes_flank, l2r_mean, l2r_dev, and l2r_flank_diff.
 
+Partial-caller / missing-caller behaviour
+------------------------------------------
+No single caller is required.  Features degrade gracefully:
+
+  - Structural, genomic, and L2R features (chrom, size, GC, mappability,
+    n_probes, n_probes_flank, rd_ratio, l2r_*) require only the merged VCF
+    plus optional BAM/BED/FASTA/mappability files.  They do not depend on
+    which callers were run.
+
+  - Per-caller flags (is_{caller}) and quality scores (qual_norm_{caller}) are
+    set to 0 / NaN for any caller absent from ``tool_vcfs``.  Only the callers
+    whose normalised VCFs are provided contribute real values.
+
+  - Caller-specific secondary INFO metrics (xhmm_rd, cnvkit_weight, etc.) are
+    NaN when that caller is not in ``tool_vcfs``.
+
+  - INDELIBLE split-read features (total_sr, sr_entropy, mapq_avg, dual_split)
+    are NaN when ``indelible_counts`` is None / empty; INDELIBLE does not need
+    to be run for the other features to be extracted.
+
+  - In SURVIVOR mode the SUPP_VEC bit-to-caller mapping is auto-detected from
+    ``##SAMPLE`` header lines; callers not provided in ``tool_vcfs`` still
+    receive an ``is_`` column (derived from SUPP_VEC) but their
+    ``qual_norm_`` column is NaN.
+
 Features extracted
 ------------------
 Structural / location
@@ -85,6 +110,9 @@ Caller-specific secondary metrics  (NaN when not present in the VCF)
 INDELIBLE split-read metrics  (NaN when not matched in indelible_counts)
     total_sr, sr_entropy, mapq_avg, dual_split
 """
+
+import argparse
+import re
 
 import pysam
 import pandas as pd
@@ -213,6 +241,65 @@ def _count_probes_flank(chrom, start, end, bed_intervals):
         if in_flank and not in_cnv:
             count += 1
     return count
+
+
+# ── SURVIVOR caller-order helper ──────────────────────────────────────────────
+
+# Recognises caller names embedded in VCF file paths from SURVIVOR ##SAMPLE lines.
+_CALLER_FILENAME_PATTERNS = [
+    ('canoes',    re.compile(r'CANOES',    re.IGNORECASE)),
+    ('clamms',    re.compile(r'CLAMMS',    re.IGNORECASE)),
+    ('xhmm',      re.compile(r'XHMM',      re.IGNORECASE)),
+    ('gatk_gcnv', re.compile(r'GCN[V]|GCNV|GATK', re.IGNORECASE)),
+    ('cnvkit',    re.compile(r'CNVKit|CNVKIT', re.IGNORECASE)),
+    ('dragen',    re.compile(r'DRAGEN',    re.IGNORECASE)),
+    ('indelible', re.compile(r'INDELIBLE', re.IGNORECASE)),
+]
+
+
+def _caller_order_from_survivor_header(vcf_header):
+    """Infer SUPP_VEC bit-to-caller mapping from SURVIVOR ##SAMPLE header lines.
+
+    SURVIVOR writes one ``##SAMPLE=<ID=N,File=path>`` meta-information line
+    per input VCF, where N is the 0-based bit position in SUPP_VEC.  This
+    helper parses those lines and matches file paths against known caller
+    filename patterns to produce an ordered list of caller names.
+
+    Parameters
+    ----------
+    vcf_header : pysam.VariantHeader
+        Header object from the SURVIVOR-merged VCF.
+
+    Returns
+    -------
+    list[str]
+        Caller names in SUPP_VEC bit order.  Positions whose filename does not
+        match any known caller receive the name ``'tool_N'``.  Returns an
+        empty list when no ``##SAMPLE`` lines are found (non-SURVIVOR VCF).
+    """
+    # pysam exposes raw header records via vcf_header.records
+    sample_entries = {}  # bit_index -> file_path
+    for rec in vcf_header.records:
+        if rec.type == 'GENERIC' and str(rec).startswith('##SAMPLE='):
+            raw = str(rec).strip()
+            id_match   = re.search(r'ID=(\d+)',     raw)
+            file_match = re.search(r'File=([^,>]+)', raw)
+            if id_match and file_match:
+                sample_entries[int(id_match.group(1))] = file_match.group(1)
+
+    if not sample_entries:
+        return []
+
+    order = []
+    for idx in sorted(sample_entries):
+        file_path = sample_entries[idx]
+        name = f'tool_{idx}'
+        for caller, pattern in _CALLER_FILENAME_PATTERNS:
+            if pattern.search(file_path):
+                name = caller
+                break
+        order.append(name)
+    return order
 
 
 # ── Read-depth helpers ────────────────────────────────────────────────────────
@@ -372,7 +459,7 @@ def _mean_mappability(chrom, start, end, mappability_intervals):
 def extract_normalized_features(
     merged_vcf,
     tool_vcfs,
-    indelible_counts,
+    indelible_counts=None,
     merger_mode='survivor',
     sample_id=None,
     bed_file=None,
@@ -388,12 +475,20 @@ def extract_normalized_features(
     merged_vcf : str
         Path to SURVIVOR- or Truvari-merged VCF.
     tool_vcfs : dict[str, str]
-        Ordered mapping of caller name -> path to *normalised* per-caller VCF
+        Mapping of caller name -> path to *normalised* per-caller VCF
         (produced by ``normalise_cnv_caller_quality_scores.py``).
-        In SURVIVOR mode the dict order must match the SUPP_VEC bit positions.
-    indelible_counts : pd.DataFrame
+        Only the callers that were actually run need to be included.
+        In SURVIVOR mode the caller order for SUPP_VEC bit mapping is
+        auto-detected from the ``##SAMPLE`` header lines; any callers not
+        provided still receive an ``is_`` column (from SUPP_VEC) but their
+        ``qual_norm_`` column will be NaN.
+        Pass an empty dict ``{}`` if no per-caller normalised VCFs are
+        available (structural and genomic features are still extracted).
+    indelible_counts : pd.DataFrame or None, optional
         INDELIBLE small-variant count table with columns:
         Start, Total_SR, Entropy, MAPQ_Avg, Dual_Split.
+        Pass ``None`` (default) when INDELIBLE was not run; the four
+        split-read feature columns will be NaN for all records.
     merger_mode : {'survivor', 'truvari'}
         How the merged VCF was produced.
     sample_id : str, optional
@@ -416,6 +511,12 @@ def extract_normalized_features(
     pd.DataFrame
         One row per merged SV record; columns described in the module docstring.
     """
+    # ── normalise optional inputs ─────────────────────────────────────────
+    if indelible_counts is None:
+        indelible_counts = pd.DataFrame(
+            columns=['Start', 'Total_SR', 'Entropy', 'MAPQ_Avg', 'Dual_Split']
+        )
+
     # ── load optional annotation sources ─────────────────────────────────
     bed_intervals = _load_bed(bed_file) if bed_file else {}
     mappability_intervals = (
@@ -436,7 +537,15 @@ def extract_normalized_features(
     # ── open VCFs ─────────────────────────────────────────────────────────
     vcf_in = pysam.VariantFile(merged_vcf)
     tools = {k: pysam.VariantFile(v) for k, v in tool_vcfs.items()}
-    caller_order = list(tool_vcfs.keys())
+
+    # In SURVIVOR mode, try to derive the authoritative SUPP_VEC bit order
+    # from the ##SAMPLE header lines so that callers not in tool_vcfs still
+    # receive an is_{caller} column (NaN qual_norm is expected for those).
+    if merger_mode == 'survivor':
+        header_order = _caller_order_from_survivor_header(vcf_in.header)
+        caller_order = header_order if header_order else list(tool_vcfs.keys())
+    else:
+        caller_order = list(tool_vcfs.keys())
 
     all_records = []
 
@@ -571,6 +680,11 @@ def extract_normalized_features(
                 else:
                     v_data[f'qual_norm_{caller_name}'] = np.nan
 
+            # Concordance for Truvari: sum of is_{caller} flags
+            v_data['concordance'] = sum(
+                v_data.get(f'is_{cn}', 0) for cn in caller_order
+            )
+
         # ── aggregate quality summaries across all supporting callers ─────
         # Inspired by CN-Learn's per-caller binary flags but enriched with
         # QUAL_norm: one summary captures the "best" quality signal; the
@@ -610,24 +724,86 @@ def extract_normalized_features(
     return pd.DataFrame(all_records)
 
 
-# Example usage:
-# tool_vcfs = {                               # order matches SURVIVOR SUPP_VEC bits
-#     'canoes':    'sample_CANOES.normalised.vcf.gz',
-#     'clamms':    'sample_CLAMMS.normalised.vcf.gz',
-#     'xhmm':      'sample_XHMM.normalised.vcf.gz',
-#     'gatk':      'sample_GCNV.normalised.vcf.gz',
-#     'cnvkit':    'sample_CNVKIT.normalised.vcf.gz',
-#     'dragen':    'sample_DRAGEN.normalised.vcf.gz',
-#     'indelible': 'sample_INDELIBLE.normalised.vcf.gz',
-# }
-# indelible_counts = pd.read_csv('indelible_counts.tsv', sep='\t')
-# df = extract_normalized_features(
-#     'merged.vcf',
-#     tool_vcfs,
-#     indelible_counts,
-#     merger_mode='survivor',
-#     bed_file='capture_targets.bed',
-#     bam_file='sample.cram',
-#     reference_fasta='GRCh38.fa',
-#     mappability_file='mappability_100mer.bed',
-# )
+# ── Command-line interface ────────────────────────────────────────────────────
+# Allows the script to be called directly from Nextflow or the shell:
+#
+#   python feature_extraction.py \
+#     --merged_vcf  sample_survivor_union.vcf \
+#     --output      sample_features.tsv \
+#     [--tool_vcfs  canoes=sample_CANOES.norm.vcf.gz,clamms=sample_CLAMMS.norm.vcf.gz] \
+#     [--merger_mode survivor] \
+#     [--indelible_counts indelible_counts.tsv] \
+#     [--bed_file    capture.bed] \
+#     [--bam_file    sample.bam] \
+#     [--reference_fasta GRCh38.fa] \
+#     [--mappability_file mappability.bed] \
+#     [--rd_flank 500] \
+#     [--sample_id SAMPLE_001]
+
+def _build_cli_parser():
+    p = argparse.ArgumentParser(
+        description='Extract ML feature matrix from a SURVIVOR/Truvari merged VCF.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    p.add_argument('--merged_vcf',        required=True,
+                   help='SURVIVOR- or Truvari-merged VCF (bgzipped or plain).')
+    p.add_argument('--output',            required=True,
+                   help='Output TSV path for the feature matrix.')
+    p.add_argument('--tool_vcfs',         default='',
+                   help='Comma-separated caller=vcf_path pairs, e.g. '
+                        'canoes=sample_CANOES.norm.vcf.gz,'
+                        'clamms=sample_CLAMMS.norm.vcf.gz')
+    p.add_argument('--merger_mode',       default='survivor',
+                   choices=['survivor', 'truvari'],
+                   help='VCF merge strategy that produced merged_vcf.')
+    p.add_argument('--indelible_counts',  default=None,
+                   help='INDELIBLE count TSV (Start,Total_SR,Entropy,MAPQ_Avg,'
+                        'Dual_Split).  Omit if INDELIBLE was not run.')
+    p.add_argument('--bed_file',          default=None,
+                   help='Capture-target BED for probe counting.')
+    p.add_argument('--bam_file',          default=None,
+                   help='BAM or CRAM for read-depth ratio and L2R statistics.')
+    p.add_argument('--reference_fasta',   default=None,
+                   help='Reference FASTA (required for GC content and CRAMs).')
+    p.add_argument('--mappability_file',  default=None,
+                   help='4-column mappability BED (chrom,start,end,score).')
+    p.add_argument('--rd_flank',          default=500, type=int,
+                   help='Flanking bp for read-depth ratio calculation.')
+    p.add_argument('--sample_id',         default=None,
+                   help='Sample identifier (written to output column sample_id).')
+    return p
+
+
+if __name__ == '__main__':
+    args = _build_cli_parser().parse_args()
+
+    # Parse tool_vcfs string: "caller1=path1,caller2=path2"
+    tool_vcfs = {}
+    if args.tool_vcfs:
+        for pair in args.tool_vcfs.split(','):
+            if '=' in pair:
+                name, path = pair.split('=', 1)
+                tool_vcfs[name.strip()] = path.strip()
+
+    indelible_counts = None
+    if args.indelible_counts:
+        indelible_counts = pd.read_csv(args.indelible_counts, sep='\t')
+
+    df = extract_normalized_features(
+        merged_vcf=args.merged_vcf,
+        tool_vcfs=tool_vcfs,
+        indelible_counts=indelible_counts,
+        merger_mode=args.merger_mode,
+        sample_id=args.sample_id,
+        bed_file=args.bed_file,
+        bam_file=args.bam_file,
+        reference_fasta=args.reference_fasta,
+        mappability_file=args.mappability_file,
+        rd_flank=args.rd_flank,
+    )
+
+    if args.sample_id:
+        df.insert(0, 'sample_id', args.sample_id)
+
+    df.to_csv(args.output, sep='\t', index=False)
+

@@ -13,6 +13,7 @@ include { CNVKIT } from './modules/modules-cnvkit.nf'
 include { GATK_GCNV } from './modules/modules-gatk-gcnv.nf'
 include { SURVIVOR } from './modules/modules-survivor.nf'
 include { TRUVARI } from './modules/modules-truvari.nf'
+include { FEATURE_EXTRACTION } from './modules/modules-feature-extraction.nf'
 
 // =====================================================================================
 // GLOBAL SETUP
@@ -140,6 +141,40 @@ workflow RUN_TRUVARI {
         TRUVARI(grouped_vcfs)
 }
 
+workflow RUN_FEATURE_EXTRACTION {
+    take:
+        // Channel of tuples:
+        // [ sample_id, merged_vcf ]
+        // Optional annotation params are taken from the global params block.
+        merged_vcf_ch
+    main:
+        // Build the tool_vcfs string from any per-caller normalised VCF dirs
+        // provided via params.  Only callers whose params are set are included.
+        feature_inputs = merged_vcf_ch.map { sample_id, merged_vcf ->
+            def parts = []
+            if (params.get('canoes_norm_dir',    false)) parts << "canoes=${params.canoes_norm_dir}/${sample_id}_CANOES.normalised.vcf.gz"
+            if (params.get('clamms_norm_dir',    false)) parts << "clamms=${params.clamms_norm_dir}/${sample_id}_CLAMMS.normalised.vcf.gz"
+            if (params.get('xhmm_norm_dir',      false)) parts << "xhmm=${params.xhmm_norm_dir}/${sample_id}_XHMM.normalised.vcf.gz"
+            if (params.get('cnvkit_norm_dir',    false)) parts << "cnvkit=${params.cnvkit_norm_dir}/${sample_id}_CNVKIT.normalised.vcf.gz"
+            if (params.get('gcnv_norm_dir',      false)) parts << "gatk_gcnv=${params.gcnv_norm_dir}/${sample_id}_GCNV.normalised.vcf.gz"
+            if (params.get('dragen_norm_dir',    false)) parts << "dragen=${params.dragen_norm_dir}/${sample_id}_DRAGEN.normalised.vcf.gz"
+            if (params.get('indelible_norm_dir', false)) parts << "indelible=${params.indelible_norm_dir}/${sample_id}_INDELIBLE.normalised.vcf.gz"
+            def tool_vcfs_str = parts.join(',')
+
+            def bam_f          = params.get('bam_file',          false) ? file(params.bam_file)          : []
+            def fasta_f        = params.get('reference_fasta',   false) ? file(params.reference_fasta)   : []
+            def bed_f          = params.get('bed_file',          false) ? file(params.bed_file)          : []
+            def map_f          = params.get('mappability_file',  false) ? file(params.mappability_file)  : []
+            def indelible_f    = params.get('indelible_counts',  false) ? file(params.indelible_counts)  : []
+            def mode           = params.get('merger_mode', 'survivor')
+
+            return [sample_id, merged_vcf, tool_vcfs_str, mode,
+                    bam_f, fasta_f, bed_f, map_f, indelible_f]
+        }
+
+        FEATURE_EXTRACTION(feature_inputs)
+}
+
 // =====================================================================================
 // WORKFLOW SWITCH - FULLY INDEPENDENT EXECUTION BLOCKS
 // =====================================================================================
@@ -239,6 +274,24 @@ workflow {
             RUN_TRUVARI(ch_vcfs)
             break
 
+        case['feature_extraction']:
+            // Run feature extraction on an already-produced merged VCF.
+            // Required: --merged_vcf_dir  (directory containing <sample_id>_survivor_union.vcf
+            //                              or <sample_id>_truvari_merged.vcf files)
+            // Optional annotation params (any subset may be omitted):
+            //   --canoes_norm_dir, --clamms_norm_dir, --xhmm_norm_dir, --cnvkit_norm_dir,
+            //   --gcnv_norm_dir, --dragen_norm_dir, --indelible_norm_dir
+            //   --bam_file, --reference_fasta, --bed_file, --mappability_file,
+            //   --indelible_counts, --merger_mode (default: survivor)
+            def vcf_pattern = params.get('merger_mode', 'survivor') == 'truvari'
+                ? params.merged_vcf_dir + '/**/*truvari*.vcf*'
+                : params.merged_vcf_dir + '/**/*survivor*.vcf*'
+            Channel.fromPath(vcf_pattern)
+                .map { f -> [f.name.replaceAll(/_survivor.*|_truvari.*/, '').replaceAll(/\.vcf(\.gz)?$/i, ''), f] }
+                .set { ch_merged }
+            RUN_FEATURE_EXTRACTION(ch_merged)
+            break
+
         default:
             exit 1, """
 OOOPS!! SEEMS LIKE WE HAVE A WORKFLOW ERROR!
@@ -254,6 +307,7 @@ Please use one of the following options for workflows:
     --workflow gcnv       
     --workflow survivor     
     --workflow truvari
+    --workflow feature_extraction
 """
             break
     }

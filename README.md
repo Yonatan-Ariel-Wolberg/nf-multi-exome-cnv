@@ -50,8 +50,8 @@ Built with Nextflow for reproducible, scalable, and portable data analysis.
 ### Software
 - **Apptainer** (formerly Singularity): >= 1.0  
   All tool containers are pulled and executed via Apptainer. Install it following the [official guide](https://apptainer.org/docs/admin/main/installation.html). ([DOI](https://doi.org/10.1371/journal.pone.0177459))
-- **Nextflow**: >= 20.04  ([DOI](https://doi.org/10.1038/nbt.3820))
-  Install with:
+- **Nextflow**: >= 20.04  ([DOI](https://doi.org/10.1038/nbt.3820)) 
+- Install with:
   ```bash
   curl -s https://get.nextflow.io | bash
   ```

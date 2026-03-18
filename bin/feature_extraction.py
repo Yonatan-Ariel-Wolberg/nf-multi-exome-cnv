@@ -6,36 +6,60 @@ together with per-caller normalised VCFs (produced by
 ``normalise_cnv_caller_quality_scores.py``) and optional genomic annotation
 files (capture BED, BAM/CRAM, reference FASTA, mappability BED).
 
+Feature design is informed by CN-Learn (Pounraja et al. 2019,
+https://github.com/girirajanlab/CN_Learn), adapted to this pipeline's
+additional callers (XHMM, GATK-gCNV, CNVkit, DRAGEN Germline, INDELIBLE) and
+the QUAL_norm quality-score normalisation introduced here.
+
 Features extracted
 ------------------
-Structural
-    chrom, start, end, cnv_size, cnv_type (1=DUP, 0=DEL/other)
+Structural / location
+    chrom, start, end
+    chrom_encoded   -- chromosome as integer (1-22=autosomes, 23=X, 24=Y, 0=other)
+                       Mirrors CN-Learn's factorised CHR predictor.
+    cnv_size        -- CNV length in base-pairs (continuous)
+    size_label      -- ordinal size-bin (1-12) matching CN-Learn's SIZE_LABEL
+                       scheme; provides a non-linear size encoding that the RF
+                       can exploit in addition to the raw bp length.
+    cnv_type        -- 1 for DUP, 0 for DEL/other  (CN-Learn: TYPE_IND)
 
-Per-caller (one column per caller in ``tool_vcfs``)
-    is_{caller}          -- 1 if caller supports this event, else 0
+Concordance / overlap  (CN-Learn: NUM_OVERLAPS)
+    concordance -- number of callers supporting this event
+
+Per-caller flags  (CN-Learn: caller_list binary indicators)
+    is_{caller} -- 1 if caller supports this event, else 0
+
+Per-caller quality scores  (absent in CN-Learn; added because QUAL_norm makes
+    cross-caller quality directly comparable)
     qual_norm_{caller}   -- QUAL_norm score from the normalised VCF QUAL field
     raw_qual_{caller}    -- caller-native raw quality metric (non-redundant
                            with QUAL_norm): Q_SOME (CANOES/CLAMMS), SQ (XHMM),
                            QS (GATK-gCNV), CNQ (CNVkit), original QUAL (DRAGEN),
                            synthetic Phred score (INDELIBLE).
 
-Concordance
-    concordance -- number of callers supporting this event
+Aggregate quality summaries  (complements per-caller columns)
+    max_qual_norm           -- maximum QUAL_norm across all supporting callers
+    mean_qual_norm_supported -- mean QUAL_norm across callers that support this
+                                event (NaN when concordance == 0)
 
-Genomic annotations (NaN when the corresponding optional file is absent)
+Genomic annotations  (CN-Learn: RD_PROP, GC, MAP, NUM_TARGETS)
     n_probes     -- number of capture-target probes overlapping the CNV
+                    (NaN when bed_file is absent)
     rd_ratio     -- mean read depth in CNV / mean read depth in flanking regions
+                    (NaN when bam_file is absent)
     gc_content   -- GC fraction of the CNV interval
+                    (NaN when reference_fasta is absent)
     mappability  -- weighted-mean mappability score over the CNV interval
+                    (NaN when mappability_file is absent)
 
-Caller-specific secondary metrics (NaN when not present in the VCF)
+Caller-specific secondary metrics  (NaN when not present in the VCF)
     xhmm_rd        -- XHMM RD Z-score (INFO field)
     cnvkit_weight  -- CNVkit bin weight (INFO field)
     cnvkit_log2    -- CNVkit log2 ratio (INFO field)
     dragen_sm      -- DRAGEN sample median (INFO field)
     dragen_sd      -- DRAGEN sample SD (INFO field)
 
-INDELIBLE split-read metrics (NaN when not matched in indelible_counts)
+INDELIBLE split-read metrics  (NaN when not matched in indelible_counts)
     total_sr, sr_entropy, mapq_avg, dual_split
 """
 
@@ -43,6 +67,68 @@ import pysam
 import pandas as pd
 import numpy as np
 from collections import defaultdict
+
+
+# ── Chromosome encoder ────────────────────────────────────────────────────────
+
+# Mapping mirrors CN-Learn's factorised CHR predictor (girirajanlab/CN_Learn).
+_CHROM_MAP = {
+    **{str(i): i for i in range(1, 23)},
+    **{f'chr{i}': i for i in range(1, 23)},
+    'x': 23, 'chrx': 23,
+    'y': 24, 'chry': 24,
+}
+
+
+def _encode_chrom(chrom):
+    """Return an integer encoding for a chromosome name.
+
+    Autosomes 1-22 map to 1-22; X maps to 23; Y maps to 24.
+    All other values (e.g. mitochondrial, scaffolds) map to 0.
+    """
+    return _CHROM_MAP.get(str(chrom).lower(), 0)
+
+
+# ── CNV size label ────────────────────────────────────────────────────────────
+
+# Ordinal size bins taken directly from CN-Learn
+# (girirajanlab/CN_Learn/scripts/cn_learn.py).
+_SIZE_BINS = [
+    (0,        1_000,   1),   # A) < 1 KB
+    (1_000,    5_000,   2),   # B) 1 KB – 5 KB
+    (5_000,    10_000,  3),   # C) 5 KB – 10 KB
+    (10_000,   25_000,  4),   # D) 10 KB – 25 KB
+    (25_000,   50_000,  5),   # E) 25 KB – 50 KB
+    (50_000,   75_000,  6),   # F) 50 KB – 75 KB
+    (75_000,   100_000, 7),   # G) 75 KB – 100 KB
+    (100_000,  250_000, 8),   # H) 100 KB – 250 KB
+    (250_000,  500_000, 9),   # I) 250 KB – 500 KB
+    (500_000,  1_000_000, 10), # J) 500 KB – 1 MB
+    (1_000_000, 5_000_000, 11), # K) 1 MB – 5 MB
+    (5_000_000, float('inf'), 12), # L) > 5 MB
+]
+
+
+def _cnv_size_label(size_bp):
+    """Return an ordinal size-bin label (1-12) for a CNV of *size_bp* bases.
+
+    Labels match CN-Learn's SIZE_LABEL scheme so that features are directly
+    comparable when re-using CN-Learn-trained models or combining datasets.
+
+    Parameters
+    ----------
+    size_bp : int or float
+        CNV length in base-pairs (must be >= 0).
+
+    Returns
+    -------
+    int
+        A value from 1 (< 1 KB) to 12 (> 5 MB).
+    """
+    for lo, hi, label in _SIZE_BINS:
+        if lo <= size_bp < hi:
+            return label
+    return 12  # fallback for very large values
 
 
 # ── BED / probe helpers ───────────────────────────────────────────────────────
@@ -283,11 +369,13 @@ def extract_normalized_features(
 
     for record in vcf_in:
         v_data = {
-            'chrom':    record.chrom,
-            'start':    record.pos,
-            'end':      record.stop,
-            'cnv_size': record.stop - record.pos,
-            'cnv_type': 1 if 'DUP' in str(record.info.get('SVTYPE', '')) else 0,
+            'chrom':         record.chrom,
+            'start':         record.pos,
+            'end':           record.stop,
+            'chrom_encoded': _encode_chrom(record.chrom),
+            'cnv_size':      record.stop - record.pos,
+            'size_label':    _cnv_size_label(record.stop - record.pos),
+            'cnv_type':      1 if 'DUP' in str(record.info.get('SVTYPE', '')) else 0,
         }
 
         # ── GC content ────────────────────────────────────────────────────
@@ -400,6 +488,21 @@ def extract_normalized_features(
                 else:
                     v_data[f'qual_norm_{caller_name}'] = np.nan
                     v_data[f'raw_qual_{caller_name}'] = np.nan
+
+        # ── aggregate quality summaries across all supporting callers ─────
+        # Inspired by CN-Learn's per-caller binary flags but enriched with
+        # QUAL_norm: one summary captures the "best" quality signal; the
+        # other captures the average quality among all agreeing callers.
+        _qual_norm_vals = [
+            v_data[f'qual_norm_{cn}']
+            for cn in caller_order
+            if v_data.get(f'is_{cn}', 0) == 1
+            and not np.isnan(v_data.get(f'qual_norm_{cn}', np.nan))
+        ]
+        v_data['max_qual_norm'] = max(_qual_norm_vals) if _qual_norm_vals else np.nan
+        v_data['mean_qual_norm_supported'] = (
+            float(np.mean(_qual_norm_vals)) if _qual_norm_vals else np.nan
+        )
 
         # ── INDELIBLE split-read counts ───────────────────────────────────
         indelible_data = indelible_counts[indelible_counts['Start'] == record.pos]

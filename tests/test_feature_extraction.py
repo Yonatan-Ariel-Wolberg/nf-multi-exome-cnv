@@ -578,3 +578,123 @@ class TestNaNDefaults:
 
     def test_mappability_nan_without_file(self, script_text):
         assert 'mappability' in script_text and 'np.nan' in script_text
+
+
+# ===========================================================================
+# 13. CN-Learn-inspired features: _cnv_size_label
+# ===========================================================================
+
+class TestCnvSizeLabel:
+    """_cnv_size_label must map CNV sizes to CN-Learn's ordinal size bins."""
+
+    def test_size_label_present(self, script_text):
+        assert 'def _cnv_size_label(' in script_text
+
+    def test_size_label_column_emitted(self, script_text):
+        assert 'size_label' in script_text
+
+    def test_bin_1_less_than_1kb(self, fe):
+        assert fe._cnv_size_label(500) == 1
+
+    def test_bin_1_boundary_999(self, fe):
+        assert fe._cnv_size_label(999) == 1
+
+    def test_bin_2_exactly_1kb(self, fe):
+        assert fe._cnv_size_label(1_000) == 2
+
+    def test_bin_3_5kb(self, fe):
+        assert fe._cnv_size_label(5_000) == 3
+
+    def test_bin_4_10kb(self, fe):
+        assert fe._cnv_size_label(10_000) == 4
+
+    def test_bin_5_25kb(self, fe):
+        assert fe._cnv_size_label(25_000) == 5
+
+    def test_bin_6_50kb(self, fe):
+        assert fe._cnv_size_label(50_000) == 6
+
+    def test_bin_7_75kb(self, fe):
+        assert fe._cnv_size_label(75_000) == 7
+
+    def test_bin_8_100kb(self, fe):
+        assert fe._cnv_size_label(100_000) == 8
+
+    def test_bin_9_250kb(self, fe):
+        assert fe._cnv_size_label(250_000) == 9
+
+    def test_bin_10_500kb(self, fe):
+        assert fe._cnv_size_label(500_000) == 10
+
+    def test_bin_11_1mb(self, fe):
+        assert fe._cnv_size_label(1_000_000) == 11
+
+    def test_bin_12_5mb(self, fe):
+        assert fe._cnv_size_label(5_000_000) == 12
+
+    def test_bin_12_very_large(self, fe):
+        assert fe._cnv_size_label(10_000_000) == 12
+
+    def test_all_labels_in_range_1_to_12(self, fe):
+        test_sizes = [0, 500, 999, 1000, 4999, 5000, 9999, 10000, 24999,
+                      25000, 49999, 50000, 74999, 75000, 99999, 100000,
+                      249999, 250000, 499999, 500000, 999999, 1000000,
+                      4999999, 5000000, 10000000]
+        for s in test_sizes:
+            label = fe._cnv_size_label(s)
+            assert 1 <= label <= 12, f"size {s} -> label {label} not in [1,12]"
+
+
+# ===========================================================================
+# 14. CN-Learn-inspired features: _encode_chrom
+# ===========================================================================
+
+class TestEncodeChrom:
+    """_encode_chrom must return integer chromosome codes matching CN-Learn."""
+
+    def test_encode_chrom_present(self, script_text):
+        assert 'def _encode_chrom(' in script_text
+
+    def test_chrom_encoded_column_emitted(self, script_text):
+        assert 'chrom_encoded' in script_text
+
+    def test_autosome_without_prefix(self, fe):
+        assert fe._encode_chrom('1') == 1
+        assert fe._encode_chrom('22') == 22
+
+    def test_autosome_with_chr_prefix(self, fe):
+        assert fe._encode_chrom('chr1') == 1
+        assert fe._encode_chrom('chr22') == 22
+
+    def test_x_chromosome(self, fe):
+        assert fe._encode_chrom('X') == 23
+        assert fe._encode_chrom('chrX') == 23
+        assert fe._encode_chrom('x') == 23
+
+    def test_y_chromosome(self, fe):
+        assert fe._encode_chrom('Y') == 24
+        assert fe._encode_chrom('chrY') == 24
+
+    def test_unknown_returns_zero(self, fe):
+        assert fe._encode_chrom('chrM') == 0
+        assert fe._encode_chrom('scaffold_1') == 0
+        assert fe._encode_chrom('') == 0
+
+
+# ===========================================================================
+# 15. Aggregate quality summary columns
+# ===========================================================================
+
+class TestAggregateQualNorm:
+    """max_qual_norm and mean_qual_norm_supported columns must be present."""
+
+    def test_max_qual_norm_present(self, script_text):
+        assert 'max_qual_norm' in script_text
+
+    def test_mean_qual_norm_supported_present(self, script_text):
+        assert 'mean_qual_norm_supported' in script_text
+
+    def test_aggregate_computed_from_supporting_callers_only(self, script_text):
+        # The aggregate must filter on is_{caller} == 1, not all callers.
+        assert "is_{cn}" in script_text or "f'is_{cn}'" in script_text or \
+               "_qual_norm_vals" in script_text

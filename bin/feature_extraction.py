@@ -43,6 +43,16 @@ No single caller is required.  Features degrade gracefully:
     receive an ``is_`` column (derived from SUPP_VEC) but their
     ``qual_norm_`` column is NaN.
 
+  - In TRUVARI mode the caller-contribution information is derived from the
+    ``MatchId`` INFO field together with the optional ``collapsed_vcf`` produced
+    by ``truvari collapse``.  Each representative record (in the merged VCF) and
+    each collapsed record share a common ``MatchId`` integer.  The TOOL / TOOLS
+    INFO field (written by every VCF converter script in this pipeline) is read
+    from both the representative and collapsed records to identify all callers
+    that contributed to each merged event.  When ``collapsed_vcf`` is None the
+    representative record's own TOOL field is still used, but multi-caller
+    clusters are not detected.
+
 Features extracted
 ------------------
 Structural / location
@@ -308,6 +318,82 @@ def _caller_order_from_survivor_header(vcf_header):
     return order
 
 
+# ── Truvari caller-tracing helpers ───────────────────────────────────────────
+
+# Maps TOOL / TOOLS INFO values written by each converter script to the
+# canonical caller name used throughout this module.
+_TOOL_VALUE_PATTERNS = _CALLER_FILENAME_PATTERNS  # reuse same regexes
+
+
+def _caller_from_tool_info(record):
+    """Return the canonical caller name from a VCF record's TOOL/TOOLS INFO field.
+
+    Both ``TOOL=<value>`` (used by CANOES, CLAMMS, XHMM, CNVkit, GATK-gCNV,
+    INDELIBLE) and ``TOOLS=<value>`` (used by DRAGEN) are checked.
+
+    Parameters
+    ----------
+    record : pysam.VariantRecord
+
+    Returns
+    -------
+    str or None
+        Canonical caller name (e.g. ``'canoes'``, ``'dragen'``) or ``None``
+        when neither field is present or no pattern matches.
+    """
+    tool_val = None
+    for field in ('TOOL', 'TOOLS'):
+        try:
+            val = record.info.get(field)
+            if val is not None:
+                tool_val = str(val)
+                break
+        except (KeyError, TypeError):
+            pass
+    if tool_val is None:
+        return None
+    for caller, pattern in _TOOL_VALUE_PATTERNS:
+        if pattern.search(tool_val):
+            return caller
+    return None
+
+
+def _build_matchid_caller_map(collapsed_vcf_path):
+    """Build a mapping from Truvari ``MatchId`` to the set of caller names.
+
+    ``truvari collapse`` emits every *redundant* record (i.e. the non-
+    representative member of each cluster) to the collapsed VCF and annotates
+    both that record and the representative record in the merged VCF with the
+    same ``MatchId`` integer.  This function reads the collapsed VCF and
+    collects, for each ``MatchId``, all caller names identified via the
+    TOOL/TOOLS INFO field.
+
+    Parameters
+    ----------
+    collapsed_vcf_path : str
+        Path to the collapsed VCF produced by ``truvari collapse -c``.
+
+    Returns
+    -------
+    dict[int, set[str]]
+        ``{match_id: {caller_name, ...}}``.  Only entries with a recognised
+        caller name are included; unknown records are silently skipped.
+    """
+    matchid_callers = defaultdict(set)
+    vcf = pysam.VariantFile(collapsed_vcf_path)
+    try:
+        for rec in vcf:
+            match_id = rec.info.get('MatchId')
+            if match_id is None:
+                continue
+            caller = _caller_from_tool_info(rec)
+            if caller is not None:
+                matchid_callers[int(match_id)].add(caller)
+    finally:
+        vcf.close()
+    return dict(matchid_callers)
+
+
 # ── Read-depth helpers ────────────────────────────────────────────────────────
 
 def _mean_depth(bam, chrom, start, end):
@@ -467,6 +553,7 @@ def extract_normalized_features(
     tool_vcfs,
     indelible_counts=None,
     merger_mode='survivor',
+    collapsed_vcf=None,
     sample_id=None,
     bed_file=None,
     bam_file=None,
@@ -497,6 +584,15 @@ def extract_normalized_features(
         split-read feature columns will be NaN for all records.
     merger_mode : {'survivor', 'truvari'}
         How the merged VCF was produced.
+    collapsed_vcf : str or None, optional
+        Path to the collapsed VCF produced by ``truvari collapse -c``.
+        Only used when ``merger_mode='truvari'``.  When provided, the
+        ``MatchId`` INFO field is used to identify all callers (via the
+        TOOL/TOOLS INFO field) that contributed to each representative merged
+        call, enabling correct multi-caller ``is_{caller}`` flag assignment.
+        When ``None``, only the representative record's own TOOL field is used
+        (single-caller clusters are fully handled; multi-caller clusters have
+        only the representative caller flagged).
     sample_id : str, optional
         Sample identifier (not currently used for feature values but reserved
         for downstream labelling).
@@ -551,6 +647,15 @@ def extract_normalized_features(
         header_order = _caller_order_from_survivor_header(vcf_in.header)
         caller_order = header_order if header_order else list(tool_vcfs.keys())
     else:
+        # Truvari mode: build the MatchId -> callers map from the collapsed VCF
+        # (if provided) so we can flag every caller that contributed to each
+        # representative merged call.
+        matchid_caller_map = (
+            _build_matchid_caller_map(collapsed_vcf) if collapsed_vcf else {}
+        )
+        # caller_order covers all callers present in tool_vcfs; additional
+        # callers discovered from the VCF TOOL fields are added dynamically
+        # per-record so that columns are always emitted for known callers.
         caller_order = list(tool_vcfs.keys())
 
     all_records = []
@@ -652,9 +757,31 @@ def extract_normalized_features(
                     v_data[f'qual_norm_{caller_name}'] = np.nan
 
         elif merger_mode == 'truvari':
-            var_id = str(record.id) if record.id else ''
+            # Determine which callers contributed to this merged call using:
+            #   1. The representative record's own TOOL/TOOLS INFO field.
+            #   2. All collapsed records that share the same MatchId (read from
+            #      the pre-built matchid_caller_map derived from collapsed_vcf).
+            # This is the correct approach: Truvari does NOT embed caller names
+            # in record IDs; the MatchId INFO field is the authoritative link.
+            rep_caller = _caller_from_tool_info(record)
+            match_id_val = record.info.get('MatchId')
+            collapsed_callers = (
+                matchid_caller_map.get(int(match_id_val), set())
+                if match_id_val is not None
+                else set()
+            )
+            supporting_callers = collapsed_callers.copy()
+            if rep_caller is not None:
+                supporting_callers.add(rep_caller)
+
+            # Extend caller_order to include any newly discovered callers so
+            # that is_/qual_norm_ columns are always emitted for them.
+            for cn in supporting_callers:
+                if cn not in caller_order:
+                    caller_order.append(cn)
+
             for caller_name in caller_order:
-                is_supp = 1 if caller_name.upper() in var_id.upper() else 0
+                is_supp = 1 if caller_name in supporting_callers else 0
                 v_data[f'is_{caller_name}'] = is_supp
 
                 if is_supp and caller_name in tools:
@@ -734,10 +861,11 @@ def extract_normalized_features(
 # Allows the script to be called directly from Nextflow or the shell:
 #
 #   python feature_extraction.py \
-#     --merged_vcf  sample_survivor_union.vcf \
+#     --merged_vcf  sample_truvari_merged.vcf \
 #     --output      sample_features.tsv \
+#     --merger_mode truvari \
+#     [--collapsed_vcf sample_truvari_collapsed.vcf] \
 #     [--tool_vcfs  canoes=sample_CANOES.norm.vcf.gz,clamms=sample_CLAMMS.norm.vcf.gz] \
-#     [--merger_mode survivor] \
 #     [--indelible_counts indelible_counts.tsv] \
 #     [--bed_file    capture.bed] \
 #     [--bam_file    sample.bam] \
@@ -762,6 +890,10 @@ def _build_cli_parser():
     p.add_argument('--merger_mode',       default='survivor',
                    choices=['survivor', 'truvari'],
                    help='VCF merge strategy that produced merged_vcf.')
+    p.add_argument('--collapsed_vcf',     default=None,
+                   help='Collapsed VCF from truvari collapse -c (truvari mode only). '
+                        'Used with MatchId to identify all callers contributing to '
+                        'each representative merged call.')
     p.add_argument('--indelible_counts',  default=None,
                    help='INDELIBLE count TSV (Start,Total_SR,Entropy,MAPQ_Avg,'
                         'Dual_Split).  Omit if INDELIBLE was not run.')
@@ -800,6 +932,7 @@ if __name__ == '__main__':
         tool_vcfs=tool_vcfs,
         indelible_counts=indelible_counts,
         merger_mode=args.merger_mode,
+        collapsed_vcf=args.collapsed_vcf,
         sample_id=args.sample_id,
         bed_file=args.bed_file,
         bam_file=args.bam_file,

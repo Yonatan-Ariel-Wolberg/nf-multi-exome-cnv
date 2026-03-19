@@ -14,6 +14,7 @@ include { GATK_GCNV } from './modules/modules-gatk-gcnv.nf'
 include { SURVIVOR } from './modules/modules-survivor.nf'
 include { TRUVARI } from './modules/modules-truvari.nf'
 include { FEATURE_EXTRACTION } from './modules/modules-feature-extraction.nf'
+include { NORMALISE } from './modules/modules-normalise.nf'
 
 // =====================================================================================
 // GLOBAL SETUP
@@ -175,6 +176,14 @@ workflow RUN_FEATURE_EXTRACTION {
         FEATURE_EXTRACTION(feature_inputs)
 }
 
+workflow RUN_NORMALISE {
+    take:
+        // Channel of tuples: [ sample_name, vcf_path, caller_name ]
+        vcf_ch
+    main:
+        NORMALISE(vcf_ch)
+}
+
 // =====================================================================================
 // WORKFLOW SWITCH - FULLY INDEPENDENT EXECUTION BLOCKS
 // =====================================================================================
@@ -274,6 +283,22 @@ workflow {
             RUN_TRUVARI(ch_vcfs)
             break
 
+        case['normalise']:
+            // Normalise quality scores for pre-existing caller VCFs without running
+            // the full caller pipeline.
+            // Required: --vcf_dir  (directory containing raw .vcf / .vcf.gz files)
+            //           --caller   (CANOES | CLAMMS | XHMM | GATK | CNVKIT | DRAGEN | INDELIBLE)
+            Channel.fromPath(params.vcf_dir + '/*.vcf*')
+                .map { f ->
+                    def sample_name = f.name
+                        .replaceAll(/_(CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*/, '')
+                        .replaceAll(/\.(sorted\.)?vcf(\.gz)?$/, '')
+                    [sample_name, f, params.caller.toUpperCase()]
+                }
+                .set { ch_vcfs }
+            RUN_NORMALISE(ch_vcfs)
+            break
+
         case['feature_extraction']:
             // Run feature extraction on an already-produced merged VCF.
             // Required: --merged_vcf_dir  (directory containing <sample_id>_survivor_union.vcf
@@ -308,6 +333,7 @@ Please use one of the following options for workflows:
     --workflow survivor     
     --workflow truvari
     --workflow feature_extraction
+    --workflow normalise
 """
             break
     }

@@ -145,35 +145,36 @@ workflow RUN_TRUVARI {
 workflow RUN_FEATURE_EXTRACTION {
     take:
         // Channel of tuples:
-        // [ sample_id, merged_vcf ]
-        // Optional annotation params are taken from the global params block.
-        merged_vcf_ch
+        // [ sample_id, merged_vcf, collapsed_vcf, tool_vcfs_str, merger_mode,
+        //   bam_file, reference_fasta, bed_file, mappability_file, indelible_counts ]
+        // collapsed_vcf should be [] when not available (SURVIVOR mode or absent).
+        feature_inputs_ch
     main:
-        // Build the tool_vcfs string from any per-caller normalised VCF dirs
-        // provided via params.  Only callers whose params are set are included.
-        feature_inputs = merged_vcf_ch.map { sample_id, merged_vcf ->
-            def parts = []
-            if (params.get('canoes_norm_dir',    false)) parts << "canoes=${params.canoes_norm_dir}/${sample_id}_CANOES.normalised.vcf.gz"
-            if (params.get('clamms_norm_dir',    false)) parts << "clamms=${params.clamms_norm_dir}/${sample_id}_CLAMMS.normalised.vcf.gz"
-            if (params.get('xhmm_norm_dir',      false)) parts << "xhmm=${params.xhmm_norm_dir}/${sample_id}_XHMM.normalised.vcf.gz"
-            if (params.get('cnvkit_norm_dir',    false)) parts << "cnvkit=${params.cnvkit_norm_dir}/${sample_id}_CNVKIT.normalised.vcf.gz"
-            if (params.get('gcnv_norm_dir',      false)) parts << "gatk_gcnv=${params.gcnv_norm_dir}/${sample_id}_GCNV.normalised.vcf.gz"
-            if (params.get('dragen_norm_dir',    false)) parts << "dragen=${params.dragen_norm_dir}/${sample_id}_DRAGEN.normalised.vcf.gz"
-            if (params.get('indelible_norm_dir', false)) parts << "indelible=${params.indelible_norm_dir}/${sample_id}_INDELIBLE.normalised.vcf.gz"
-            def tool_vcfs_str = parts.join(',')
+        FEATURE_EXTRACTION(feature_inputs_ch)
+}
 
-            def bam_f          = params.get('bam_file',          false) ? file(params.bam_file)          : []
-            def fasta_f        = params.get('reference_fasta',   false) ? file(params.reference_fasta)   : []
-            def bed_f          = params.get('bed_file',          false) ? file(params.bed_file)          : []
-            def map_f          = params.get('mappability_file',  false) ? file(params.mappability_file)  : []
-            def indelible_f    = params.get('indelible_counts',  false) ? file(params.indelible_counts)  : []
-            def mode           = params.get('merger_mode', 'survivor')
+// Helper closure: build the feature_inputs tuple for a single merged VCF.
+// collapsed_vcf_f: a file path or [] (empty list)
+def build_feature_inputs(sample_id, merged_vcf, collapsed_vcf_f) {
+    def parts = []
+    if (params.get('canoes_norm_dir',    false)) parts << "canoes=${params.canoes_norm_dir}/${sample_id}_CANOES.normalised.vcf.gz"
+    if (params.get('clamms_norm_dir',    false)) parts << "clamms=${params.clamms_norm_dir}/${sample_id}_CLAMMS.normalised.vcf.gz"
+    if (params.get('xhmm_norm_dir',      false)) parts << "xhmm=${params.xhmm_norm_dir}/${sample_id}_XHMM.normalised.vcf.gz"
+    if (params.get('cnvkit_norm_dir',    false)) parts << "cnvkit=${params.cnvkit_norm_dir}/${sample_id}_CNVKIT.normalised.vcf.gz"
+    if (params.get('gcnv_norm_dir',      false)) parts << "gatk_gcnv=${params.gcnv_norm_dir}/${sample_id}_GCNV.normalised.vcf.gz"
+    if (params.get('dragen_norm_dir',    false)) parts << "dragen=${params.dragen_norm_dir}/${sample_id}_DRAGEN.normalised.vcf.gz"
+    if (params.get('indelible_norm_dir', false)) parts << "indelible=${params.indelible_norm_dir}/${sample_id}_INDELIBLE.normalised.vcf.gz"
+    def tool_vcfs_str = parts.join(',')
 
-            return [sample_id, merged_vcf, tool_vcfs_str, mode,
-                    bam_f, fasta_f, bed_f, map_f, indelible_f]
-        }
+    def bam_f       = params.get('bam_file',         false) ? file(params.bam_file)         : []
+    def fasta_f     = params.get('reference_fasta',  false) ? file(params.reference_fasta)  : []
+    def bed_f       = params.get('bed_file',         false) ? file(params.bed_file)         : []
+    def map_f       = params.get('mappability_file', false) ? file(params.mappability_file) : []
+    def indelible_f = params.get('indelible_counts', false) ? file(params.indelible_counts) : []
+    def mode        = params.get('merger_mode', 'survivor')
 
-        FEATURE_EXTRACTION(feature_inputs)
+    return [sample_id, merged_vcf, collapsed_vcf_f, tool_vcfs_str, mode,
+            bam_f, fasta_f, bed_f, map_f, indelible_f]
 }
 
 workflow RUN_NORMALISE {

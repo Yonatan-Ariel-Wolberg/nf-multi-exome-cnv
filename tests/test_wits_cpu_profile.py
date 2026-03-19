@@ -195,31 +195,43 @@ class TestNoHardcodedUserPaths:
         )
 
     def test_no_hardcoded_home_ywolberg(self):
-        """No /home/ywolberg paths should appear in default singularity runOptions."""
+        """No /home/ywolberg paths should appear as a hardcoded default value."""
         content = _read_config()
-        # Check the global singularity block (before profiles)
         global_section = _global_params_section(content)
-        assert '/home/ywolberg' not in global_section, (
+        # Strip comment lines (// ...) before checking for hardcoded paths
+        non_comment = '\n'.join(
+            l for l in global_section.splitlines()
+            if not l.strip().startswith('//')
+        )
+        assert '/home/ywolberg' not in non_comment, (
             "nextflow.config must not contain hardcoded '/home/ywolberg' paths "
-            "in the default (pre-profiles) section"
+            "as a default value in the pre-profiles section"
         )
 
     def test_no_hardcoded_datab_aux(self):
-        """No /dataB/aux paths should appear in the default singularity runOptions."""
+        """No /dataB/aux paths should appear as a hardcoded default value."""
         content = _read_config()
         global_section = _global_params_section(content)
-        assert '/dataB/aux' not in global_section, (
-            "nextflow.config must not hardcode '/dataB/aux' in the default "
-            "runOptions (it belongs in a user-specific config override)"
+        non_comment = '\n'.join(
+            l for l in global_section.splitlines()
+            if not l.strip().startswith('//')
+        )
+        assert '/dataB/aux' not in non_comment, (
+            "nextflow.config must not hardcode '/dataB/aux' as a default parameter "
+            "(it belongs in a user-specific params-file)"
         )
 
     def test_no_hardcoded_datag_ddd(self):
-        """No /dataG/ddd paths should appear in the default singularity runOptions."""
+        """No /dataG/ddd paths should appear as a hardcoded default value."""
         content = _read_config()
         global_section = _global_params_section(content)
-        assert '/dataG/ddd' not in global_section, (
-            "nextflow.config must not hardcode '/dataG/ddd' in the default "
-            "runOptions (it belongs in a user-specific config override)"
+        non_comment = '\n'.join(
+            l for l in global_section.splitlines()
+            if not l.strip().startswith('//')
+        )
+        assert '/dataG/ddd' not in non_comment, (
+            "nextflow.config must not hardcode '/dataG/ddd' as a default parameter "
+            "(it belongs in a user-specific params-file)"
         )
 
 
@@ -351,4 +363,190 @@ class TestIcav2DragenLabel:
             "icav2-dragen runOptions must reference params.icav2_creds_dir or "
             "System.getProperty('user.home') for the ICA credentials directory "
             "instead of hardcoding a user-specific path"
+        )
+
+
+# ===========================================================================
+# 7. bind_paths param – user-friendly directory mounting
+# ===========================================================================
+
+class TestBindPaths:
+    """params.bind_paths must be declared and wired into container runOptions."""
+
+    def _global_singularity_block(self, content):
+        """Return the body of the global singularity { } block."""
+        return _extract_block(content, r'\bsingularity')
+
+    def _global_apptainer_block(self, content):
+        """Return the body of the global apptainer { } block."""
+        return _extract_block(content, r'\bapptainer')
+
+    def test_bind_paths_param_declared(self):
+        """params.bind_paths must be declared in the global params block."""
+        content = _read_config()
+        global_section = _global_params_section(content)
+        assert 'bind_paths' in global_section, (
+            "nextflow.config must declare 'bind_paths' in the global params block "
+            "so users can specify their data directories without knowing the '-B' flag syntax"
+        )
+
+    def test_bind_paths_default_is_empty_string(self):
+        """params.bind_paths must default to an empty string."""
+        content = _read_config()
+        global_section = _global_params_section(content)
+        match = re.search(r"bind_paths\s*=\s*'([^']*)'", global_section)
+        if not match:
+            match = re.search(r'bind_paths\s*=\s*"([^"]*)"', global_section)
+        assert match is not None, "bind_paths must be declared with a default value"
+        assert match.group(1) == '', (
+            "params.bind_paths must default to '' so no paths are mounted by default; "
+            f"got: '{match.group(1)}'"
+        )
+
+    def test_singularity_run_options_uses_bind_paths(self):
+        """singularity.runOptions must reference bind_paths (via helper or inline)."""
+        content = _read_config()
+        sing = self._global_singularity_block(content)
+        run_options_line = next(
+            (l for l in sing.splitlines() if 'runOptions' in l), None
+        )
+        assert run_options_line is not None, "singularity block must set runOptions"
+        assert 'bind_paths' in run_options_line or 'bindMountFlags' in run_options_line, (
+            "singularity.runOptions must reference params.bind_paths (or the "
+            "bindMountFlags helper) to auto-generate '-B <path>' flags from the "
+            "comma-separated list of user directories"
+        )
+
+    def test_apptainer_run_options_uses_bind_paths(self):
+        """apptainer.runOptions must reference bind_paths (via helper or inline)."""
+        content = _read_config()
+        app = self._global_apptainer_block(content)
+        run_options_line = next(
+            (l for l in app.splitlines() if 'runOptions' in l), None
+        )
+        assert run_options_line is not None, "apptainer block must set runOptions"
+        assert 'bind_paths' in run_options_line or 'bindMountFlags' in run_options_line, (
+            "apptainer.runOptions must reference params.bind_paths (or the "
+            "bindMountFlags helper) to auto-generate '-B <path>' flags from the "
+            "comma-separated list of user directories"
+        )
+
+    def test_singularity_run_options_still_uses_run_options_param(self):
+        """singularity.runOptions must still forward params.runOptions for power users."""
+        content = _read_config()
+        sing = self._global_singularity_block(content)
+        run_options_line = next(
+            (l for l in sing.splitlines() if 'runOptions' in l), None
+        )
+        assert run_options_line is not None
+        assert 'params.runOptions' in run_options_line, (
+            "singularity.runOptions must still include params.runOptions so that "
+            "power users can pass advanced flags not covered by bind_paths"
+        )
+
+    def test_apptainer_run_options_still_uses_run_options_param(self):
+        """apptainer.runOptions must still forward params.runOptions for power users."""
+        content = _read_config()
+        app = self._global_apptainer_block(content)
+        run_options_line = next(
+            (l for l in app.splitlines() if 'runOptions' in l), None
+        )
+        assert run_options_line is not None
+        assert 'params.runOptions' in run_options_line, (
+            "apptainer.runOptions must still include params.runOptions so that "
+            "power users can pass advanced flags not covered by bind_paths"
+        )
+
+    def test_icav2_label_uses_bind_paths(self):
+        """icav2-dragen runOptions must also forward bind_paths."""
+        content = _read_config()
+        label = _icav2_label_section(content)
+        run_options_line = next(
+            (l for l in label.splitlines() if 'runOptions' in l), None
+        )
+        assert run_options_line is not None, "icav2-dragen label must set runOptions"
+        assert 'bind_paths' in run_options_line or 'bindMountFlags' in run_options_line, (
+            "icav2-dragen runOptions must forward params.bind_paths (or the "
+            "bindMountFlags helper) so that user data directories are accessible "
+            "inside the DRAGEN container"
+        )
+
+    def test_bind_paths_helper_or_tokenize_present(self):
+        """A bindMountFlags helper or inline tokenize must exist to split bind_paths."""
+        content = _read_config()
+        has_helper   = 'bindMountFlags' in content
+        has_tokenize = 'tokenize' in content
+        assert has_helper or has_tokenize, (
+            "nextflow.config must split params.bind_paths on commas to generate one "
+            "'-B' flag per path, either via a bindMountFlags helper function or "
+            "inline .tokenize(',') calls"
+        )
+
+    def test_bind_mount_flags_helper_generates_dash_b(self):
+        """The bind-mount logic must produce '-B' flags."""
+        content = _read_config()
+        # Check that '-B' appears somewhere in the bind-path generation logic
+        assert "' -B '" in content or '"-B"' in content or "' -B'" in content, (
+            "The bind-mount helper / inline expression must produce '-B <path>' "
+            "flags for Singularity/Apptainer"
+        )
+
+
+# ===========================================================================
+# 8. params/params-wits.json – Wits-specific template
+# ===========================================================================
+
+PARAMS_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'params-wits.json')
+
+
+class TestParamsWitsJson:
+    """params/params-wits.json must exist and contain Wits-specific bind paths."""
+
+    def _read_json(self):
+        import json
+        with open(PARAMS_WITS_JSON) as fh:
+            return json.load(fh)
+
+    def test_params_wits_json_exists(self):
+        """params/params-wits.json must exist as a Wits cluster template."""
+        assert os.path.isfile(PARAMS_WITS_JSON), (
+            "params/params-wits.json must exist as a ready-to-use template for "
+            "running the workflow on the ZA-Wits-Core HPC cluster"
+        )
+
+    def test_params_wits_json_is_valid_json(self):
+        """params/params-wits.json must be valid JSON."""
+        import json
+        with open(PARAMS_WITS_JSON) as fh:
+            try:
+                json.load(fh)
+            except json.JSONDecodeError as exc:
+                raise AssertionError(
+                    f"params/params-wits.json is not valid JSON: {exc}"
+                )
+
+    def test_params_wits_json_has_bind_paths(self):
+        """params-wits.json must have a bind_paths key."""
+        data = self._read_json()
+        assert 'bind_paths' in data, (
+            "params-wits.json must contain a 'bind_paths' key so that Wits users "
+            "can see an example of how to specify their data directories"
+        )
+
+    def test_params_wits_json_bind_paths_contains_wits_dirs(self):
+        """params-wits.json bind_paths must include the standard Wits data dirs."""
+        data = self._read_json()
+        bind_paths = data.get('bind_paths', '')
+        for expected_dir in ('/dataB/aux', '/dataG/ddd', '/dataG/ddd-2023', '/home/ywolberg'):
+            assert expected_dir in bind_paths, (
+                f"params-wits.json bind_paths must include '{expected_dir}' — "
+                "this is where the user's reference data and sample data live on "
+                "the ZA-Wits-Core cluster"
+            )
+
+    def test_params_wits_json_workflow_is_set(self):
+        """params-wits.json must declare a workflow parameter."""
+        data = self._read_json()
+        assert 'workflow' in data, (
+            "params-wits.json must specify which workflow to run via the 'workflow' key"
         )

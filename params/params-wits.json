@@ -1,0 +1,13 @@
+{
+    "workflow": "canoes",
+    "outdir": "./results",
+
+    "bind_paths": "/dataB/aux,/dataG/ddd,/dataG/ddd-2023,/home/ywolberg",
+    "runOptions": "",
+
+    "samplesheet_bams":  "/dataG/ddd/samplesheet.tsv",
+    "ref":               "/dataB/aux/GRCh38/GCA_000001405.15_GRCh38_full_analysis_set.fna",
+    "fai":               "/dataB/aux/GRCh38/GCA_000001405.15_GRCh38_full_analysis_set.fna.fai",
+    "probes":            "/dataB/aux/targets/targets.bed",
+    "canoes_batch_size": 100
+}

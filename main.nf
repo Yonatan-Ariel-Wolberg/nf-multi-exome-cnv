@@ -16,6 +16,7 @@ include { TRUVARI } from './modules/modules-truvari.nf'
 include { FEATURE_EXTRACTION } from './modules/modules-feature-extraction.nf'
 include { NORMALISE } from './modules/modules-normalise.nf'
 include { TRAIN } from './modules/modules-train.nf'
+include { EVALUATE } from './modules/modules-evaluate.nf'
 
 // =====================================================================================
 // GLOBAL SETUP
@@ -62,6 +63,14 @@ workflow RUN_INDELIBLE {
         cram_dad
     main:
         INDELIBLE(crams, cram_trios, cram_mom, cram_dad)
+        if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
+            EVALUATE(
+                INDELIBLE.out.sorted_vcf.flatten(),
+                file(params.truth_bed),
+                file(params.probes_bed),
+                'INDELIBLE'
+            )
+        }
 }
 
 workflow RUN_CANOES {
@@ -72,6 +81,14 @@ workflow RUN_CANOES {
     main:
         bam_list = bams.collectFile() { item -> [ 'bam_list_unsorted.txt', "${item[1]}" + '\n' ] }
         CANOES(bam_list, fai, Channel.from(chroms))
+        if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
+            EVALUATE(
+                CANOES.out.sorted_vcf.flatten(),
+                file(params.truth_bed),
+                file(params.probes_bed),
+                'CANOES'
+            )
+        }
 }
 
 workflow RUN_XHMM {
@@ -80,6 +97,14 @@ workflow RUN_XHMM {
     main:
         bam_list = bams.collectFile() { item -> [ 'bam_list_unsorted.txt', "${item[1]}" + '\n' ] }
         XHMM(bam_list)
+        if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
+            EVALUATE(
+                XHMM.out.sorted_vcf.flatten(),
+                file(params.truth_bed),
+                file(params.probes_bed),
+                'XHMM'
+            )
+        }
 }
 
 workflow RUN_CLAMMS {
@@ -89,6 +114,14 @@ workflow RUN_CLAMMS {
     main:
         sample_list = bams.map { it -> it[0] + '\n' }.collectFile(name: 'sample_list.txt')
         CLAMMS(bams, fai, sample_list)
+        if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
+            EVALUATE(
+                CLAMMS.out.sorted_vcf.flatten(),
+                file(params.truth_bed),
+                file(params.probes_bed),
+                'CLAMMS'
+            )
+        }
 }
 
 workflow RUN_DRAGEN {
@@ -96,6 +129,14 @@ workflow RUN_DRAGEN {
         cramPairs
     main:
         DRAGEN(cramPairs)
+        if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
+            EVALUATE(
+                DRAGEN.out.annotated_vcfs.flatten(),
+                file(params.truth_bed),
+                file(params.probes_bed),
+                'DRAGEN'
+            )
+        }
 }
 
 workflow RUN_CNVKIT {
@@ -106,6 +147,14 @@ workflow RUN_CNVKIT {
         refflat
     main:
         CNVKIT(bams, fasta, targets, refflat, bams.first().map { it[1] })
+        if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
+            EVALUATE(
+                CNVKIT.out.sorted_vcf.flatten(),
+                file(params.truth_bed),
+                file(params.probes_bed),
+                'CNVKIT'
+            )
+        }
 }
 
 workflow RUN_GCNV {
@@ -117,6 +166,24 @@ workflow RUN_GCNV {
         targets
     main:
         GATK_GCNV(bams, fasta, fai, dict, targets)
+        if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
+            EVALUATE(
+                GATK_GCNV.out.sorted_vcf.flatten(),
+                file(params.truth_bed),
+                file(params.probes_bed),
+                'GCNV'
+            )
+        }
+}
+
+workflow RUN_EVALUATE {
+    take:
+        vcf_ch
+        truth_bed
+        probes_bed
+        caller_name
+    main:
+        EVALUATE(vcf_ch, truth_bed, probes_bed, caller_name)
 }
 
 workflow RUN_SURVIVOR {
@@ -393,6 +460,26 @@ workflow {
             RUN_TRAIN(ch_features, ch_truth)
             break
 
+        case['evaluate']:
+            // Evaluate CNV caller performance (precision and sensitivity) using
+            // pre-existing per-sample VCFs produced by one of the 7 callers.
+            // VCFs are converted to BED, merged into a unified call set, and
+            // compared against the truth set at the probe (capture target) level.
+            //
+            // Required: --vcf_dir    (directory containing per-sample .vcf / .vcf.gz files)
+            //           --caller     (caller label used in output names, e.g. CANOES)
+            //           --truth_bed  (truth set BED: CHR, START, STOP, CNV_TYPE, SAMPLE_ID)
+            //           --probes_bed (capture target BED: CHR, START, STOP[, ...])
+            Channel.fromPath(params.vcf_dir + '/*.vcf*')
+                .set { ch_vcfs }
+            RUN_EVALUATE(
+                ch_vcfs,
+                file(params.truth_bed),
+                file(params.probes_bed),
+                params.caller
+            )
+            break
+
         default:
             exit 1, """
 OOOPS!! SEEMS LIKE WE HAVE A WORKFLOW ERROR!
@@ -413,6 +500,7 @@ Please use one of the following options for workflows:
     --workflow feature_extraction
     --workflow normalise
     --workflow train
+    --workflow evaluate
 """
             break
     }

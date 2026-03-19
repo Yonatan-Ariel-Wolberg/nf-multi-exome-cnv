@@ -904,3 +904,257 @@ class TestCLI:
     def test_cli_parses_tool_vcfs_pairs(self, script_text):
         """CLI must split caller=path pairs on '='."""
         assert "split('=')" in script_text or ".split('='," in script_text
+
+
+# ===========================================================================
+# 22. MatchId-based caller tracing (_build_matchid_caller_map)
+# ===========================================================================
+
+class TestBuildMatchIdCallerMap:
+    """_build_matchid_caller_map must build a MatchId -> callers set mapping."""
+
+    # ── static / source-text checks ──────────────────────────────────────────
+
+    def test_function_present(self, script_text):
+        """_build_matchid_caller_map must be defined in the script."""
+        assert 'def _build_matchid_caller_map(' in script_text
+
+    def test_reads_matchid_info_field(self, script_text):
+        """The function must read the MatchId INFO field from each record."""
+        assert "'MatchId'" in script_text or '"MatchId"' in script_text
+
+    def test_uses_defaultdict_of_sets(self, script_text):
+        """Implementation must use defaultdict(set) to accumulate caller sets."""
+        assert 'defaultdict(set)' in script_text
+
+    def test_closes_vcf_in_finally(self, script_text):
+        """VCF handle must be closed inside a finally block."""
+        assert 'vcf.close()' in script_text
+        assert 'finally:' in script_text
+
+    def test_returns_plain_dict(self, script_text):
+        """Result must be converted from defaultdict to a plain dict."""
+        assert 'return dict(matchid_callers)' in script_text
+
+    def test_calls_caller_from_tool_info(self, script_text):
+        """Must delegate caller recognition to _caller_from_tool_info."""
+        assert '_caller_from_tool_info' in script_text
+
+    # ── functional tests (pysam.VariantFile patched on the module) ───────────
+
+    def test_returns_empty_dict_for_empty_vcf(self, fe):
+        """Empty VCF must produce an empty mapping."""
+        from unittest import mock
+
+        mock_vcf = mock.MagicMock()
+        mock_vcf.__iter__ = mock.Mock(return_value=iter([]))
+        mock_vcf.close = mock.Mock()
+
+        with mock.patch.object(fe, 'pysam') as mock_pysam:
+            mock_pysam.VariantFile.return_value = mock_vcf
+            result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+        assert result == {}
+
+    def test_returns_dict_not_defaultdict(self, fe):
+        """Return value must be a plain dict, not a defaultdict."""
+        from unittest import mock
+
+        mock_vcf = mock.MagicMock()
+        mock_vcf.__iter__ = mock.Mock(return_value=iter([]))
+        mock_vcf.close = mock.Mock()
+
+        with mock.patch.object(fe, 'pysam') as mock_pysam:
+            mock_pysam.VariantFile.return_value = mock_vcf
+            result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+        assert type(result) is dict
+
+    def test_skips_records_without_matchid(self, fe):
+        """Records that lack a MatchId INFO field must be silently skipped."""
+        from unittest import mock
+
+        rec = mock.MagicMock()
+        rec.info.get.return_value = None  # all INFO lookups return None
+
+        mock_vcf = mock.MagicMock()
+        mock_vcf.__iter__ = mock.Mock(return_value=iter([rec]))
+        mock_vcf.close = mock.Mock()
+
+        with mock.patch.object(fe, 'pysam') as mock_pysam:
+            mock_pysam.VariantFile.return_value = mock_vcf
+            result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+        assert result == {}
+
+    def test_skips_records_with_unrecognised_caller(self, fe):
+        """Records whose TOOL value matches no known caller must be silently skipped."""
+        from unittest import mock
+
+        def _info_get(field, default=None):
+            if field == 'MatchId':
+                return 3
+            return 'UNKNOWN_TOOL_XYZ'
+
+        rec = mock.MagicMock()
+        rec.info.get.side_effect = _info_get
+
+        mock_vcf = mock.MagicMock()
+        mock_vcf.__iter__ = mock.Mock(return_value=iter([rec]))
+        mock_vcf.close = mock.Mock()
+
+        with mock.patch.object(fe, 'pysam') as mock_pysam:
+            mock_pysam.VariantFile.return_value = mock_vcf
+            result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+        assert result == {}
+
+    def test_single_canoes_record(self, fe):
+        """A single CANOES record with MatchId=1 produces {1: {'canoes'}}."""
+        from unittest import mock
+
+        def _info_get(field, default=None):
+            if field == 'MatchId':
+                return 1
+            if field == 'TOOL':
+                return 'CANOES'
+            return None
+
+        rec = mock.MagicMock()
+        rec.info.get.side_effect = _info_get
+
+        mock_vcf = mock.MagicMock()
+        mock_vcf.__iter__ = mock.Mock(return_value=iter([rec]))
+        mock_vcf.close = mock.Mock()
+
+        with mock.patch.object(fe, 'pysam') as mock_pysam:
+            mock_pysam.VariantFile.return_value = mock_vcf
+            result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+        assert result == {1: {'canoes'}}
+
+    def test_multiple_callers_same_matchid(self, fe):
+        """Two records sharing the same MatchId are merged into one set."""
+        from unittest import mock
+
+        def _make_rec(match_id, tool_name):
+            def _info_get(field, default=None):
+                if field == 'MatchId':
+                    return match_id
+                if field == 'TOOL':
+                    return tool_name
+                return None
+            rec = mock.MagicMock()
+            rec.info.get.side_effect = _info_get
+            return rec
+
+        recs = [_make_rec(5, 'CANOES'), _make_rec(5, 'DRAGEN')]
+
+        mock_vcf = mock.MagicMock()
+        mock_vcf.__iter__ = mock.Mock(return_value=iter(recs))
+        mock_vcf.close = mock.Mock()
+
+        with mock.patch.object(fe, 'pysam') as mock_pysam:
+            mock_pysam.VariantFile.return_value = mock_vcf
+            result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+        assert result == {5: {'canoes', 'dragen'}}
+
+    def test_different_matchids_stay_separate(self, fe):
+        """Records with distinct MatchIds produce independent set entries."""
+        from unittest import mock
+
+        def _make_rec(match_id, tool_name):
+            def _info_get(field, default=None):
+                if field == 'MatchId':
+                    return match_id
+                if field == 'TOOL':
+                    return tool_name
+                return None
+            rec = mock.MagicMock()
+            rec.info.get.side_effect = _info_get
+            return rec
+
+        recs = [
+            _make_rec(1, 'CANOES'),
+            _make_rec(2, 'XHMM'),
+            _make_rec(3, 'DRAGEN'),
+        ]
+
+        mock_vcf = mock.MagicMock()
+        mock_vcf.__iter__ = mock.Mock(return_value=iter(recs))
+        mock_vcf.close = mock.Mock()
+
+        with mock.patch.object(fe, 'pysam') as mock_pysam:
+            mock_pysam.VariantFile.return_value = mock_vcf
+            result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+        assert result == {1: {'canoes'}, 2: {'xhmm'}, 3: {'dragen'}}
+
+    def test_matchid_cast_to_int(self, fe):
+        """MatchId values are cast to int before being used as dict keys."""
+        from unittest import mock
+
+        def _info_get(field, default=None):
+            if field == 'MatchId':
+                return '7'  # string value, must be cast to int
+            if field == 'TOOL':
+                return 'CNVKIT'
+            return None
+
+        rec = mock.MagicMock()
+        rec.info.get.side_effect = _info_get
+
+        mock_vcf = mock.MagicMock()
+        mock_vcf.__iter__ = mock.Mock(return_value=iter([rec]))
+        mock_vcf.close = mock.Mock()
+
+        with mock.patch.object(fe, 'pysam') as mock_pysam:
+            mock_pysam.VariantFile.return_value = mock_vcf
+            result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+        assert 7 in result
+        assert result[7] == {'cnvkit'}
+
+    def test_all_supported_callers_recognised(self, fe):
+        """Every caller in SUPPORTED_CALLERS must be matchable via a TOOL value."""
+        from unittest import mock
+
+        # Map canonical name -> a TOOL string that _TOOL_VALUE_PATTERNS recognises.
+        tool_strings = {
+            'canoes':    'CANOES',
+            'clamms':    'CLAMMS',
+            'xhmm':      'XHMM',
+            'gatk_gcnv': 'GCNV',
+            'cnvkit':    'CNVKIT',
+            'dragen':    'DRAGEN',
+            'indelible': 'INDELIBLE',
+        }
+
+        for idx, caller_name in enumerate(fe.SUPPORTED_CALLERS):
+            tool_str = tool_strings[caller_name]
+
+            def _info_get(field, default=None, _mid=idx + 1, _t=tool_str):
+                if field == 'MatchId':
+                    return _mid
+                if field == 'TOOL':
+                    return _t
+                return None
+
+            rec = mock.MagicMock()
+            rec.info.get.side_effect = _info_get
+
+            mock_vcf = mock.MagicMock()
+            mock_vcf.__iter__ = mock.Mock(return_value=iter([rec]))
+            mock_vcf.close = mock.Mock()
+
+            with mock.patch.object(fe, 'pysam') as mock_pysam:
+                mock_pysam.VariantFile.return_value = mock_vcf
+                result = fe._build_matchid_caller_map('/fake/collapsed.vcf')
+
+            assert idx + 1 in result, (
+                f"MatchId {idx + 1} missing; TOOL='{tool_str}' not recognised as '{caller_name}'"
+            )
+            assert caller_name in result[idx + 1], (
+                f"Expected '{caller_name}' for TOOL='{tool_str}', got {result[idx + 1]}"
+            )

@@ -15,6 +15,7 @@ include { SURVIVOR } from './modules/modules-survivor.nf'
 include { TRUVARI } from './modules/modules-truvari.nf'
 include { FEATURE_EXTRACTION } from './modules/modules-feature-extraction.nf'
 include { NORMALISE } from './modules/modules-normalise.nf'
+include { TRAIN } from './modules/modules-train.nf'
 
 // =====================================================================================
 // GLOBAL SETUP
@@ -183,6 +184,17 @@ workflow RUN_NORMALISE {
         vcf_ch
     main:
         NORMALISE(vcf_ch)
+}
+
+workflow RUN_TRAIN {
+    take:
+        // Channel of individual *_features.tsv file paths (one per sample).
+        features_tsv_ch
+        // Single-element channel containing the path to the truth-labels TSV.
+        // Required columns: sample_id, chrom, start, end, truth_label
+        truth_labels_ch
+    main:
+        TRAIN(features_tsv_ch, truth_labels_ch)
 }
 
 workflow RUN_SURVIVOR_WITH_FEATURES {
@@ -366,6 +378,21 @@ workflow {
             RUN_FEATURE_EXTRACTION(ch_feature_inputs)
             break
 
+        case['train']:
+            // Train an XGBoost classifier on CNV feature matrices produced by
+            // the feature_extraction workflow.
+            // Required: --features_dir   (directory containing *_features.tsv files
+            //                             produced by the feature_extraction workflow)
+            //           --truth_labels   (TSV file with columns:
+            //                             sample_id, chrom, start, end, truth_label
+            //                             where truth_label=1 means true CNV)
+            Channel.fromPath(params.features_dir + '/**/*_features.tsv')
+                .set { ch_features }
+            Channel.value(file(params.truth_labels))
+                .set { ch_truth }
+            RUN_TRAIN(ch_features, ch_truth)
+            break
+
         default:
             exit 1, """
 OOOPS!! SEEMS LIKE WE HAVE A WORKFLOW ERROR!
@@ -385,6 +412,7 @@ Please use one of the following options for workflows:
     --workflow truvari_with_features
     --workflow feature_extraction
     --workflow normalise
+    --workflow train
 """
             break
     }

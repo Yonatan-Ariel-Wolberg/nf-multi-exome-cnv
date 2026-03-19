@@ -1,3 +1,8 @@
+import argparse
+import glob
+import os
+import sys
+
 import pandas as pd
 import xgboost as xgb
 from imblearn.over_sampling import SMOTE
@@ -81,16 +86,120 @@ def cross_validate_model(model, X, y, n_splits=5):
     print(f"Cross-validated F1 scores: {scores}")
     print(f"Mean F1 score: {scores.mean()}")
 
-# Load your feature data (assumed to be in a CSV format from extraction)
-# df_features = pd.read_csv('features.csv')
+def main():
+    """Entry point for command-line invocation from Nextflow or the shell.
 
-# Prepare features and labels
-# X = prepare_training_data(df_features)
-# y = df_features['truth_label']  # Assuming truth_label column exists
+    Usage
+    -----
+    python train_xgboost.py \\
+        --features_dir  ./out_FEATURES \\
+        --truth_labels  truth_labels.tsv \\
+        [--output_model  cnv_model.json] \\
+        [--output_report training_report.txt]
 
-# Train and evaluate model
-# model, X_res, y_res = train_validation_model(X, y)
-# cross_validate_model(model, X_res, y_res)
+    The ``features_dir`` is searched recursively for files matching
+    ``*_features.tsv`` (the output pattern of ``feature_extraction.py``).
 
-# Example usage:
-# Ensure to uncomment the above lines and fill in actual paths and logic as per your environment.
+    The ``truth_labels`` TSV must contain at minimum the columns:
+        sample_id, chrom, start, end, truth_label
+    where ``truth_label`` is 1 for a true CNV and 0 for a false positive.
+    """
+    parser = argparse.ArgumentParser(
+        description='Train an XGBoost classifier on CNV feature matrices.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        '--features_dir', required=True,
+        help='Directory (searched recursively) containing *_features.tsv files '
+             'produced by feature_extraction.py.',
+    )
+    parser.add_argument(
+        '--truth_labels', required=True,
+        help='TSV file with columns: sample_id, chrom, start, end, truth_label.',
+    )
+    parser.add_argument(
+        '--output_model', default='cnv_model.json',
+        help='Output path for the trained XGBoost model (XGBoost JSON format).',
+    )
+    parser.add_argument(
+        '--output_report', default='training_report.txt',
+        help='Output path for the training metrics report.',
+    )
+    args = parser.parse_args()
+
+    # ── Load all feature TSV files ────────────────────────────────────────────
+    tsv_files = sorted(
+        glob.glob(os.path.join(args.features_dir, '**', '*_features.tsv'), recursive=True)
+        + glob.glob(os.path.join(args.features_dir, '*_features.tsv'))
+    )
+    # De-duplicate (glob may return the same file twice when features_dir == '.')
+    tsv_files = list(dict.fromkeys(tsv_files))
+
+    if not tsv_files:
+        sys.exit(
+            f"ERROR: No *_features.tsv files found under '{args.features_dir}'. "
+            "Run the feature_extraction workflow first."
+        )
+
+    features_df = pd.concat(
+        [pd.read_csv(f, sep='\t') for f in tsv_files],
+        ignore_index=True,
+    )
+
+    # ── Load truth labels ─────────────────────────────────────────────────────
+    labels_df = pd.read_csv(args.truth_labels, sep='\t')
+    required_cols = {'sample_id', 'chrom', 'start', 'end', 'truth_label'}
+    missing_cols = required_cols - set(labels_df.columns)
+    if missing_cols:
+        sys.exit(
+            f"ERROR: truth_labels file is missing required columns: {missing_cols}"
+        )
+
+    # ── Merge features with truth labels ─────────────────────────────────────
+    merged = features_df.merge(
+        labels_df[['sample_id', 'chrom', 'start', 'end', 'truth_label']],
+        on=['sample_id', 'chrom', 'start', 'end'],
+        how='inner',
+    )
+
+    if merged.empty:
+        sys.exit(
+            "ERROR: No matching records found after joining features with truth labels. "
+            "Check that sample_id / chrom / start / end values align."
+        )
+
+    y = merged['truth_label']
+    X_raw = merged.drop(columns=['truth_label'])
+
+    # prepare_training_data validates caller columns and handles legacy supp_vec
+    X_raw = prepare_training_data(X_raw)
+
+    # Drop non-numeric / identifier columns before passing to the model
+    id_cols = [c for c in ('sample_id', 'chrom', 'cnv_type') if c in X_raw.columns]
+    X = X_raw.drop(columns=id_cols).select_dtypes(include=[np.number])
+
+    # ── Train and cross-validate ──────────────────────────────────────────────
+    model, X_res, y_res = train_validation_model(X, y)
+    cross_validate_model(model, X_res, y_res)
+    model.fit(X_res, y_res)
+
+    # ── Persist the trained model ─────────────────────────────────────────────
+    model.save_model(args.output_model)
+
+    # ── Write training report ─────────────────────────────────────────────────
+    n_pos = int(y.sum())
+    n_neg = int((y == 0).sum())
+    with open(args.output_report, 'w') as fh:
+        fh.write(f"Feature TSV files:         {len(tsv_files)}\n")
+        fh.write(f"Training samples (calls):  {len(X)}\n")
+        fh.write(f"True CNVs  (label=1):      {n_pos}\n")
+        fh.write(f"False CNVs (label=0):      {n_neg}\n")
+        fh.write(f"Feature columns:           {list(X.columns)}\n")
+        fh.write(f"Model saved to:            {args.output_model}\n")
+
+    print(f"Model saved to {args.output_model}")
+    print(f"Report written to {args.output_report}")
+
+
+if __name__ == '__main__':
+    main()

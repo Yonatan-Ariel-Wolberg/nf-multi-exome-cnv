@@ -214,7 +214,7 @@ class TestEvaluateCallerPerformance:
         truth    = mod.load_cnv_file(truth_bed)
         callset  = mod.load_cnv_file(callset_bed_full)
         cats     = mod.categorize_probes(probes, truth, callset)
-        sens, prec, tn = mod.compute_metrics(cats)
+        sens, prec, tp, tn, fp, fn, spec, f_beta, mcc = mod.compute_metrics(cats)
         assert sens == 1.0
         assert prec == 1.0
         assert tn == 1
@@ -227,7 +227,7 @@ class TestEvaluateCallerPerformance:
         truth    = mod.load_cnv_file(truth_bed)
         callset  = mod.load_cnv_file(callset_bed_empty)
         cats     = mod.categorize_probes(probes, truth, callset)
-        sens, prec, tn = mod.compute_metrics(cats)
+        sens, prec, tp, tn, fp, fn, spec, f_beta, mcc = mod.compute_metrics(cats)
         assert sens == 0.0
 
     def test_load_cnv_file_has_cnv_type_column(self, truth_bed):
@@ -257,7 +257,7 @@ class TestEvaluateCallerPerformance:
 
     def test_main_writes_output_file(
             self, truth_bed, callset_bed_full, probes_bed, tmp_path):
-        """main() writes Sensitivity / Precision / True Negatives to the output file."""
+        """main() writes all metrics including new ones to the output file."""
         import evaluate_caller_performance as mod
         out = str(tmp_path / 'metrics.txt')
         sys.argv = ['evaluate_caller_performance.py',
@@ -270,6 +270,92 @@ class TestEvaluateCallerPerformance:
         assert 'Sensitivity' in content
         assert 'Precision'   in content
         assert 'True Negatives' in content
+        assert 'Specificity' in content
+        assert 'F_beta' in content
+        assert 'Matthews Correlation Coefficient' in content
+        assert 'Confusion Matrix' in content
+
+    def test_perfect_call_specificity(
+            self, truth_bed, callset_bed_full, probes_bed):
+        """Specificity is 1.0 when no FPs exist (the one non-truth probe is TN)."""
+        import evaluate_caller_performance as mod
+        probes  = mod.load_bed_file(probes_bed)
+        truth   = mod.load_cnv_file(truth_bed)
+        callset = mod.load_cnv_file(callset_bed_full)
+        cats    = mod.categorize_probes(probes, truth, callset)
+        _, _, tp, tn, fp, fn, spec, f_beta, mcc = mod.compute_metrics(cats)
+        assert spec == 1.0
+
+    def test_perfect_call_mcc(
+            self, truth_bed, callset_bed_full, probes_bed):
+        """MCC is 1.0 for a perfect classifier."""
+        import evaluate_caller_performance as mod
+        probes  = mod.load_bed_file(probes_bed)
+        truth   = mod.load_cnv_file(truth_bed)
+        callset = mod.load_cnv_file(callset_bed_full)
+        cats    = mod.categorize_probes(probes, truth, callset)
+        _, _, tp, tn, fp, fn, spec, f_beta, mcc = mod.compute_metrics(cats)
+        assert mcc == 1.0
+
+    def test_perfect_call_f_beta(
+            self, truth_bed, callset_bed_full, probes_bed):
+        """F_beta is 1.0 for a perfect classifier."""
+        import evaluate_caller_performance as mod
+        probes  = mod.load_bed_file(probes_bed)
+        truth   = mod.load_cnv_file(truth_bed)
+        callset = mod.load_cnv_file(callset_bed_full)
+        cats    = mod.categorize_probes(probes, truth, callset)
+        _, _, tp, tn, fp, fn, spec, f_beta, mcc = mod.compute_metrics(cats)
+        assert f_beta == 1.0
+
+    def test_empty_callset_specificity(
+            self, truth_bed, callset_bed_empty, probes_bed):
+        """Specificity is 1.0 when call set is empty (no FPs)."""
+        import evaluate_caller_performance as mod
+        probes  = mod.load_bed_file(probes_bed)
+        truth   = mod.load_cnv_file(truth_bed)
+        callset = mod.load_cnv_file(callset_bed_empty)
+        cats    = mod.categorize_probes(probes, truth, callset)
+        _, _, tp, tn, fp, fn, spec, f_beta, mcc = mod.compute_metrics(cats)
+        assert spec == 1.0
+
+    def test_empty_callset_f_beta_zero(
+            self, truth_bed, callset_bed_empty, probes_bed):
+        """F_beta is 0.0 when sensitivity and precision are both 0."""
+        import evaluate_caller_performance as mod
+        probes  = mod.load_bed_file(probes_bed)
+        truth   = mod.load_cnv_file(truth_bed)
+        callset = mod.load_cnv_file(callset_bed_empty)
+        cats    = mod.categorize_probes(probes, truth, callset)
+        _, _, tp, tn, fp, fn, spec, f_beta, mcc = mod.compute_metrics(cats)
+        assert f_beta == 0.0
+
+    def test_confusion_matrix_counts(
+            self, truth_bed, callset_bed_full, probes_bed):
+        """TP=2, FP=0, FN=0, TN=1 for the full-call fixture."""
+        import evaluate_caller_performance as mod
+        probes  = mod.load_bed_file(probes_bed)
+        truth   = mod.load_cnv_file(truth_bed)
+        callset = mod.load_cnv_file(callset_bed_full)
+        cats    = mod.categorize_probes(probes, truth, callset)
+        _, _, tp, tn, fp, fn, spec, f_beta, mcc = mod.compute_metrics(cats)
+        assert tp == 2
+        assert fp == 0
+        assert fn == 0
+        assert tn == 1
+
+    def test_beta_parameter(
+            self, truth_bed, callset_bed_full, probes_bed):
+        """compute_metrics accepts a custom beta value."""
+        import evaluate_caller_performance as mod
+        probes  = mod.load_bed_file(probes_bed)
+        truth   = mod.load_cnv_file(truth_bed)
+        callset = mod.load_cnv_file(callset_bed_full)
+        cats    = mod.categorize_probes(probes, truth, callset)
+        _, _, tp, tn, fp, fn, spec, f_beta1, mcc = mod.compute_metrics(cats, beta=1)
+        _, _, tp, tn, fp, fn, spec, f_beta2, mcc = mod.compute_metrics(cats, beta=2)
+        assert f_beta1 == 1.0
+        assert f_beta2 == 1.0
 
 
 # ---------------------------------------------------------------------------

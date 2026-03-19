@@ -858,8 +858,98 @@ class TestCallerOrderFromSurvivorHeader:
 
 
 # ===========================================================================
-# 21. CLI argparse interface
+# 20b. SUPP_VEC → caller set (_callers_from_supp_vec)
 # ===========================================================================
+
+class TestCallersSuppVec:
+    """_callers_from_supp_vec must correctly map SUPP_VEC bits to caller names.
+
+    This is the core mechanism by which the feature extraction script
+    ascertains which CNV callers were involved in calling a variant.
+    """
+
+    def test_function_present(self, script_text):
+        """_callers_from_supp_vec must be defined in the script."""
+        assert 'def _callers_from_supp_vec(' in script_text
+
+    def test_returns_set(self, fe):
+        """Return type must be a set."""
+        result = fe._callers_from_supp_vec('101', ['canoes', 'xhmm', 'cnvkit'])
+        assert isinstance(result, set)
+
+    def test_single_caller_first_bit(self, fe):
+        """Only bit 0 set → only the first caller."""
+        result = fe._callers_from_supp_vec('100', ['canoes', 'xhmm', 'cnvkit'])
+        assert result == {'canoes'}
+
+    def test_single_caller_middle_bit(self, fe):
+        """Only bit 1 set → only the second caller."""
+        result = fe._callers_from_supp_vec('010', ['canoes', 'xhmm', 'cnvkit'])
+        assert result == {'xhmm'}
+
+    def test_single_caller_last_bit(self, fe):
+        """Only bit 2 set → only the third caller."""
+        result = fe._callers_from_supp_vec('001', ['canoes', 'xhmm', 'cnvkit'])
+        assert result == {'cnvkit'}
+
+    def test_two_callers(self, fe):
+        """Bits 0 and 2 set → first and third callers."""
+        result = fe._callers_from_supp_vec('101', ['canoes', 'xhmm', 'cnvkit'])
+        assert result == {'canoes', 'cnvkit'}
+
+    def test_all_callers(self, fe):
+        """All bits set → all callers returned."""
+        order = ['canoes', 'clamms', 'xhmm']
+        result = fe._callers_from_supp_vec('111', order)
+        assert result == {'canoes', 'clamms', 'xhmm'}
+
+    def test_no_callers_all_zeros(self, fe):
+        """All bits zero → empty set (variant called by nobody)."""
+        result = fe._callers_from_supp_vec('000', ['canoes', 'xhmm', 'cnvkit'])
+        assert result == set()
+
+    def test_empty_supp_vec_returns_empty_set(self, fe):
+        """Empty SUPP_VEC string → empty set."""
+        result = fe._callers_from_supp_vec('', ['canoes', 'xhmm'])
+        assert result == set()
+
+    def test_empty_caller_order_falls_back_to_tool_n(self, fe):
+        """When caller_order is empty, bit positions fall back to 'tool_N' names."""
+        result = fe._callers_from_supp_vec('101', [])
+        assert result == {'tool_0', 'tool_2'}
+
+    def test_partial_caller_order_falls_back_to_tool_n(self, fe):
+        """Bit positions beyond caller_order length fall back to 'tool_N'."""
+        result = fe._callers_from_supp_vec('111', ['canoes'])
+        assert result == {'canoes', 'tool_1', 'tool_2'}
+
+    def test_concordance_equals_len_result(self, fe):
+        """len(result) gives concordance (number of callers that called variant)."""
+        result = fe._callers_from_supp_vec('1101', ['canoes', 'clamms', 'xhmm', 'cnvkit'])
+        assert len(result) == 3
+
+    def test_all_seven_supported_callers(self, fe):
+        """All 7 supported callers can be identified from a full SUPP_VEC."""
+        order = list(fe.SUPPORTED_CALLERS)
+        supp_vec = '1111111'
+        result = fe._callers_from_supp_vec(supp_vec, order)
+        assert result == set(fe.SUPPORTED_CALLERS)
+
+    def test_subset_of_supported_callers(self, fe):
+        """Only callers with bit='1' are returned, not the full SUPPORTED_CALLERS."""
+        order = list(fe.SUPPORTED_CALLERS)  # canoes,clamms,xhmm,gatk_gcnv,cnvkit,dragen,indelible
+        # Only canoes (bit 0) and cnvkit (bit 4)
+        supp_vec = '1000100'
+        result = fe._callers_from_supp_vec(supp_vec, order)
+        assert result == {'canoes', 'cnvkit'}
+
+    def test_function_used_in_survivor_branch(self, script_text):
+        """_callers_from_supp_vec must be called in the SURVIVOR mode branch."""
+        assert '_callers_from_supp_vec(' in script_text
+
+    def test_concordance_uses_len_of_supporting_callers(self, script_text):
+        """concordance must be derived from len(supporting_callers), not a raw sum."""
+        assert 'len(supporting_callers)' in script_text
 
 class TestCLI:
     """feature_extraction.py must expose an argparse CLI."""

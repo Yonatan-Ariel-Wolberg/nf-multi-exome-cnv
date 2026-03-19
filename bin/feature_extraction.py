@@ -318,6 +318,52 @@ def _caller_order_from_survivor_header(vcf_header):
     return order
 
 
+def _callers_from_supp_vec(supp_vec, caller_order):
+    """Return the set of caller names that supported a variant.
+
+    This is the central mechanism by which the feature extraction script
+    ascertains which CNV callers were involved in calling a variant.
+    SURVIVOR encodes caller support as a binary string (SUPP_VEC) in the
+    merged VCF INFO field: each character is ``'0'`` (caller did not call
+    the variant) or ``'1'`` (caller called the variant).  Bit position ``i``
+    corresponds to the caller at ``caller_order[i]``, where ``caller_order``
+    is derived from the ``##SAMPLE`` header lines by
+    ``_caller_order_from_survivor_header``.
+
+    Parameters
+    ----------
+    supp_vec : str
+        SUPP_VEC value from the SURVIVOR-merged VCF INFO field (e.g. ``'1011'``
+        for a variant called by callers 0, 2, and 3 but not caller 1).
+        Each character must be ``'0'`` or ``'1'``.
+    caller_order : list[str]
+        Ordered list of caller names corresponding to SUPP_VEC bit positions,
+        as returned by ``_caller_order_from_survivor_header``.
+        Bit positions beyond ``len(caller_order)`` fall back to ``'tool_{i}'``.
+
+    Returns
+    -------
+    set[str]
+        Caller names whose corresponding SUPP_VEC bit is ``'1'``.  An empty
+        set is returned when all bits are ``'0'`` or ``supp_vec`` is empty.
+
+    Examples
+    --------
+    >>> _callers_from_supp_vec('101', ['canoes', 'xhmm', 'cnvkit'])
+    {'canoes', 'cnvkit'}
+    >>> _callers_from_supp_vec('010', ['canoes', 'xhmm', 'cnvkit'])
+    {'xhmm'}
+    >>> _callers_from_supp_vec('000', ['canoes', 'xhmm', 'cnvkit'])
+    set()
+    """
+    callers = set()
+    for i, bit in enumerate(supp_vec):
+        if bit == '1':
+            name = caller_order[i] if i < len(caller_order) else f'tool_{i}'
+            callers.add(name)
+    return callers
+
+
 # ── Truvari caller-tracing helpers ───────────────────────────────────────────
 
 # Maps TOOL / TOOLS INFO values written by each converter script to the
@@ -717,14 +763,18 @@ def extract_normalized_features(
 
         # ── per-caller quality features ───────────────────────────────────
         if merger_mode == 'survivor':
+            # _callers_from_supp_vec maps each '1' bit in SUPP_VEC to the
+            # corresponding caller name, determining which callers were
+            # involved in calling this variant.
             supp_vec = str(record.info.get('SUPP_VEC', '0' * len(caller_order)))
-            v_data['concordance'] = sum(int(x) for x in supp_vec)
+            supporting_callers = _callers_from_supp_vec(supp_vec, caller_order)
+            v_data['concordance'] = len(supporting_callers)
 
             for i, bit in enumerate(supp_vec):
                 caller_name = caller_order[i] if i < len(caller_order) else f'tool_{i}'
                 v_data[f'is_{caller_name}'] = int(bit)
 
-                if bit == '1' and caller_name in tools:
+                if caller_name in supporting_callers and caller_name in tools:
                     matches = list(
                         tools[caller_name].fetch(
                             record.chrom, record.pos - 10, record.pos + 10

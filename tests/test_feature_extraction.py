@@ -23,6 +23,7 @@ import importlib
 import io
 import math
 import os
+import re
 import sys
 import types
 
@@ -904,3 +905,71 @@ class TestCLI:
     def test_cli_parses_tool_vcfs_pairs(self, script_text):
         """CLI must split caller=path pairs on '='."""
         assert "split('=')" in script_text or ".split('='," in script_text
+
+
+# ===========================================================================
+# 22. Single-caller mode (merger_mode='single')
+# ===========================================================================
+
+class TestSingleCallerMode:
+    """merger_mode='single' supports feature extraction from a single-caller VCF."""
+
+    def test_single_in_cli_choices(self, script_text):
+        """'single' must be listed as a valid choice for --merger_mode in the CLI."""
+        assert "'single'" in script_text, (
+            "_build_cli_parser must include 'single' in --merger_mode choices "
+            "so single-caller feature extraction is accessible from the command line"
+        )
+
+    def test_single_mode_branch_present(self, script_text):
+        """extract_normalized_features must have an elif merger_mode == 'single' branch."""
+        assert "merger_mode == 'single'" in script_text, (
+            "extract_normalized_features must contain an "
+            "``elif merger_mode == 'single':`` branch to handle single-caller VCFs"
+        )
+
+    def test_single_mode_sets_concordance_1(self, script_text):
+        """In single mode concordance must be set to 1 (all records from one caller)."""
+        # Locate the single-mode branch and verify concordance = 1 assignment
+        single_branch = re.search(
+            r"elif merger_mode == 'single':(.*?)(?=\n        # ──|\n\n        # ──|\Z)",
+            script_text,
+            re.DOTALL,
+        )
+        assert single_branch, "single-mode branch not found"
+        assert "concordance'] = 1" in single_branch.group(1), (
+            "In single mode every record comes from the single caller, "
+            "so concordance must be set to 1"
+        )
+
+    def test_single_mode_sets_is_caller_1(self, script_text):
+        """In single mode is_{caller} must be set to 1 for callers in tool_vcfs."""
+        single_branch = re.search(
+            r"elif merger_mode == 'single':(.*?)(?=\n        # ──|\n\n        # ──|\Z)",
+            script_text,
+            re.DOTALL,
+        )
+        assert single_branch, "single-mode branch not found"
+        assert "is_{caller_name}'] = 1" in single_branch.group(1), (
+            "In single mode is_{caller} must be 1 for all callers in tool_vcfs"
+        )
+
+    def test_single_mode_looks_up_qual_norm(self, script_text):
+        """In single mode qual_norm_{caller} must be read from the tool VCF."""
+        single_branch = re.search(
+            r"elif merger_mode == 'single':(.*?)(?=\n        # ──|\n\n        # ──|\Z)",
+            script_text,
+            re.DOTALL,
+        )
+        assert single_branch, "single-mode branch not found"
+        assert "qual_norm_{caller_name}']" in single_branch.group(1), (
+            "In single mode qual_norm_{caller} must be looked up from the "
+            "normalised tool VCF QUAL field"
+        )
+
+    def test_docstring_mentions_single_mode(self, script_text):
+        """Module or function docstring must describe the single merger_mode."""
+        assert "merger_mode='single'" in script_text or "merger_mode = 'single'" in script_text, (
+            "The module or function docstring must describe merger_mode='single' "
+            "so users know how to run feature extraction on a single-caller VCF"
+        )

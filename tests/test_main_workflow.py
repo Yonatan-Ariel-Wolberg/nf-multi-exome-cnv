@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Integration tests for main.nf – verifies that all 9 workflow cases are
+Integration tests for main.nf – verifies that all workflow cases are
 wired correctly and that all supporting files are coherent.
 
 Covers:
-  1. All 9 workflow modules are included (INDELIBLE, CANOES, XHMM, CLAMMS,
+  1. All 9 caller workflow modules are included (INDELIBLE, CANOES, XHMM, CLAMMS,
      DRAGEN, CNVKIT, GATK_GCNV, SURVIVOR, TRUVARI).
-  2. Every workflow case is present in the switch block:
+  2. Every caller workflow case is present in the switch block:
      indelible, canoes, xhmm, clamms, dragen, cnvkit, gcnv, survivor, truvari.
   3. gather_vcfs() checks for at least 2 caller directories before continuing.
   4. The get_id closure strips caller name suffixes and .vcf/.vcf.gz extensions
@@ -16,6 +16,9 @@ Covers:
   6. All 9 params JSON files exist in params/ and contain valid JSON with the
      correct "workflow" key.
   7. Each params JSON references a workflow name that matches one of the 9 cases.
+  8. Combined end-to-end workflows survivor_features and truvari_features exist
+     and chain the consensus merge step directly into feature extraction.
+  9. feature_extraction case supports merger_mode='single' for single-caller VCFs.
 """
 
 import json
@@ -476,4 +479,235 @@ class TestDsl2Declaration:
         """main.nf must start with a Nextflow shebang line."""
         assert main_text.startswith("#!/usr/bin/env nextflow"), (
             "main.nf must start with '#!/usr/bin/env nextflow'"
+        )
+
+
+# ===========================================================================
+# 8. Combined end-to-end workflows: survivor_features and truvari_features
+# ===========================================================================
+
+# Params files for the combined workflows
+COMBINED_PARAMS_FILES = {
+    "survivor_features": "params-survivor-features.json",
+    "truvari_features":  "params-truvari-features.json",
+}
+
+
+class TestCombinedWorkflowModes:
+    """survivor_features and truvari_features must chain consensus + feature extraction."""
+
+    def test_survivor_features_case_present(self, main_text):
+        """case['survivor_features'] must be present in the workflow switch."""
+        assert "case['survivor_features']" in main_text, (
+            "main.nf switch block must contain case['survivor_features'] "
+            "for the end-to-end SURVIVOR → feature_extraction workflow"
+        )
+
+    def test_truvari_features_case_present(self, main_text):
+        """case['truvari_features'] must be present in the workflow switch."""
+        assert "case['truvari_features']" in main_text, (
+            "main.nf switch block must contain case['truvari_features'] "
+            "for the end-to-end Truvari → feature_extraction workflow"
+        )
+
+    def test_run_survivor_with_features_defined(self, main_text):
+        """workflow RUN_SURVIVOR_WITH_FEATURES must be defined in main.nf."""
+        assert "workflow RUN_SURVIVOR_WITH_FEATURES" in main_text, (
+            "main.nf must define 'workflow RUN_SURVIVOR_WITH_FEATURES' as a "
+            "sub-workflow that chains SURVIVOR consensus merging into feature extraction"
+        )
+
+    def test_run_truvari_with_features_defined(self, main_text):
+        """workflow RUN_TRUVARI_WITH_FEATURES must be defined in main.nf."""
+        assert "workflow RUN_TRUVARI_WITH_FEATURES" in main_text, (
+            "main.nf must define 'workflow RUN_TRUVARI_WITH_FEATURES' as a "
+            "sub-workflow that chains Truvari consensus merging into feature extraction"
+        )
+
+    def test_survivor_with_features_calls_survivor(self, main_text):
+        """RUN_SURVIVOR_WITH_FEATURES must invoke the SURVIVOR module workflow."""
+        run_swf = re.search(
+            r"workflow RUN_SURVIVOR_WITH_FEATURES\s*\{(.+?)(?=\nworkflow |\Z)",
+            main_text,
+            re.DOTALL,
+        )
+        assert run_swf, "workflow RUN_SURVIVOR_WITH_FEATURES not found"
+        assert "SURVIVOR(" in run_swf.group(1), (
+            "RUN_SURVIVOR_WITH_FEATURES must call SURVIVOR() to produce a merged VCF"
+        )
+
+    def test_survivor_with_features_calls_feature_extraction(self, main_text):
+        """RUN_SURVIVOR_WITH_FEATURES must invoke FEATURE_EXTRACTION."""
+        run_swf = re.search(
+            r"workflow RUN_SURVIVOR_WITH_FEATURES\s*\{(.+?)(?=\nworkflow |\Z)",
+            main_text,
+            re.DOTALL,
+        )
+        assert run_swf, "workflow RUN_SURVIVOR_WITH_FEATURES not found"
+        assert "FEATURE_EXTRACTION(" in run_swf.group(1), (
+            "RUN_SURVIVOR_WITH_FEATURES must call FEATURE_EXTRACTION() to "
+            "extract ML features from the merged VCF"
+        )
+
+    def test_truvari_with_features_calls_truvari(self, main_text):
+        """RUN_TRUVARI_WITH_FEATURES must invoke the TRUVARI module workflow."""
+        run_twf = re.search(
+            r"workflow RUN_TRUVARI_WITH_FEATURES\s*\{(.+?)(?=\nworkflow |\Z)",
+            main_text,
+            re.DOTALL,
+        )
+        assert run_twf, "workflow RUN_TRUVARI_WITH_FEATURES not found"
+        assert "TRUVARI(" in run_twf.group(1), (
+            "RUN_TRUVARI_WITH_FEATURES must call TRUVARI() to produce a merged VCF"
+        )
+
+    def test_truvari_with_features_calls_feature_extraction(self, main_text):
+        """RUN_TRUVARI_WITH_FEATURES must invoke FEATURE_EXTRACTION."""
+        run_twf = re.search(
+            r"workflow RUN_TRUVARI_WITH_FEATURES\s*\{(.+?)(?=\nworkflow |\Z)",
+            main_text,
+            re.DOTALL,
+        )
+        assert run_twf, "workflow RUN_TRUVARI_WITH_FEATURES not found"
+        assert "FEATURE_EXTRACTION(" in run_twf.group(1), (
+            "RUN_TRUVARI_WITH_FEATURES must call FEATURE_EXTRACTION() to "
+            "extract ML features from the merged VCF"
+        )
+
+    def test_survivor_with_features_filters_single_caller(self, main_text):
+        """RUN_SURVIVOR_WITH_FEATURES must require >= 2 caller VCFs per sample."""
+        run_swf = re.search(
+            r"workflow RUN_SURVIVOR_WITH_FEATURES\s*\{(.+?)(?=\nworkflow |\Z)",
+            main_text,
+            re.DOTALL,
+        )
+        assert run_swf, "workflow RUN_SURVIVOR_WITH_FEATURES not found"
+        assert "vcfs.size() >= 2" in run_swf.group(1), (
+            "RUN_SURVIVOR_WITH_FEATURES must filter samples with vcfs.size() >= 2 "
+            "so that SURVIVOR always receives at least two caller VCFs"
+        )
+
+    def test_truvari_with_features_filters_single_caller(self, main_text):
+        """RUN_TRUVARI_WITH_FEATURES must require >= 2 caller VCFs per sample."""
+        run_twf = re.search(
+            r"workflow RUN_TRUVARI_WITH_FEATURES\s*\{(.+?)(?=\nworkflow |\Z)",
+            main_text,
+            re.DOTALL,
+        )
+        assert run_twf, "workflow RUN_TRUVARI_WITH_FEATURES not found"
+        assert "vcfs.size() >= 2" in run_twf.group(1), (
+            "RUN_TRUVARI_WITH_FEATURES must filter samples with vcfs.size() >= 2 "
+            "so that Truvari always receives at least two caller VCFs"
+        )
+
+    def test_survivor_features_in_help_message(self, main_text):
+        """The default error message must list --workflow survivor_features."""
+        assert "--workflow survivor_features" in main_text, (
+            "The default error message must list '--workflow survivor_features' "
+            "as a valid workflow option"
+        )
+
+    def test_truvari_features_in_help_message(self, main_text):
+        """The default error message must list --workflow truvari_features."""
+        assert "--workflow truvari_features" in main_text, (
+            "The default error message must list '--workflow truvari_features' "
+            "as a valid workflow option"
+        )
+
+    def test_survivor_features_uses_gather_vcfs(self, main_text):
+        """case['survivor_features'] must call gather_vcfs() to collect caller VCFs."""
+        sf_case = re.search(
+            r"case\['survivor_features'\](.+?)break",
+            main_text,
+            re.DOTALL,
+        )
+        assert sf_case, "case['survivor_features'] block not found"
+        assert "gather_vcfs()" in sf_case.group(1), (
+            "case['survivor_features'] must call gather_vcfs() to assemble caller VCFs"
+        )
+
+    def test_truvari_features_uses_gather_vcfs(self, main_text):
+        """case['truvari_features'] must call gather_vcfs() to collect caller VCFs."""
+        tf_case = re.search(
+            r"case\['truvari_features'\](.+?)break",
+            main_text,
+            re.DOTALL,
+        )
+        assert tf_case, "case['truvari_features'] block not found"
+        assert "gather_vcfs()" in tf_case.group(1), (
+            "case['truvari_features'] must call gather_vcfs() to assemble caller VCFs"
+        )
+
+    @pytest.mark.parametrize("workflow_name,filename", COMBINED_PARAMS_FILES.items())
+    def test_combined_params_file_exists(self, workflow_name, filename):
+        """Each combined workflow must have a params JSON file in params/."""
+        path = os.path.join(PARAMS_DIR, filename)
+        assert os.path.isfile(path), (
+            f"params/{filename} must exist for the {workflow_name} workflow"
+        )
+
+    @pytest.mark.parametrize("workflow_name,filename", COMBINED_PARAMS_FILES.items())
+    def test_combined_params_workflow_value(self, workflow_name, filename):
+        """The 'workflow' key in each combined params file must match the workflow name."""
+        path = os.path.join(PARAMS_DIR, filename)
+        if not os.path.isfile(path):
+            pytest.skip(f"{filename} does not exist")
+        with open(path) as fh:
+            data = json.load(fh)
+        assert data.get("workflow") == workflow_name, (
+            f"params/{filename}: 'workflow' must be '{workflow_name}', "
+            f"got '{data.get('workflow')}'"
+        )
+
+    @pytest.mark.parametrize("workflow_name,filename", COMBINED_PARAMS_FILES.items())
+    def test_combined_params_have_caller_dirs(self, workflow_name, filename):
+        """Combined workflow params files must specify at least two caller dirs."""
+        path = os.path.join(PARAMS_DIR, filename)
+        if not os.path.isfile(path):
+            pytest.skip(f"{filename} does not exist")
+        with open(path) as fh:
+            data = json.load(fh)
+        caller_dir_keys = [
+            "canoes_dir", "clamms_dir", "xhmm_dir",
+            "cnvkit_dir", "gcnv_dir", "dragen_dir", "indelible_dir",
+        ]
+        found = [k for k in caller_dir_keys if k in data]
+        assert len(found) >= 2, (
+            f"params/{filename} must specify at least two caller_dir keys "
+            f"so gather_vcfs() has enough inputs. Found: {found}"
+        )
+
+
+# ===========================================================================
+# 9. feature_extraction case: single-caller (merger_mode='single') support
+# ===========================================================================
+
+class TestFeatureExtractionSingleMode:
+    """case['feature_extraction'] must handle merger_mode='single' for single-caller VCFs."""
+
+    def test_single_mode_vcf_pattern_present(self, main_text):
+        """feature_extraction case must define a broad *.vcf* pattern for single mode."""
+        fe_case = re.search(
+            r"case\['feature_extraction'\](.+?)break",
+            main_text,
+            re.DOTALL,
+        )
+        assert fe_case, "case['feature_extraction'] block not found"
+        assert "'single'" in fe_case.group(1), (
+            "case['feature_extraction'] must check for merger_mode == 'single' "
+            "to select the correct VCF glob pattern for single-caller VCFs"
+        )
+
+    def test_single_mode_uses_caller_suffix_regex(self, main_text):
+        """In single mode the sample ID must be extracted with the caller-suffix regex."""
+        fe_case = re.search(
+            r"case\['feature_extraction'\](.+?)break",
+            main_text,
+            re.DOTALL,
+        )
+        assert fe_case, "case['feature_extraction'] block not found"
+        # The single-mode branch must use the same caller-stripping regex as gather_vcfs
+        assert "CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE" in fe_case.group(1), (
+            "case['feature_extraction'] must strip caller-name suffixes "
+            "(CANOES|CLAMMS|...) when merger_mode == 'single'"
         )

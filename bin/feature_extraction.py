@@ -1,8 +1,9 @@
 """
 Feature extraction for CNV machine-learning models.
 
-Extracts a rich feature matrix from a SURVIVOR- or Truvari-merged SV VCF
-together with per-caller normalised VCFs (produced by
+Extracts a rich feature matrix from a SURVIVOR- or Truvari-merged SV VCF,
+or from a single-caller VCF (``merger_mode='single'``), together with
+per-caller normalised VCFs (produced by
 ``normalise_cnv_caller_quality_scores.py``) and optional genomic annotation
 files (capture BED, BAM/CRAM, reference FASTA, mappability BED).
 
@@ -42,6 +43,12 @@ No single caller is required.  Features degrade gracefully:
     ``##SAMPLE`` header lines; callers not provided in ``tool_vcfs`` still
     receive an ``is_`` column (derived from SUPP_VEC) but their
     ``qual_norm_`` column is NaN.
+
+  - In single mode (``merger_mode='single'``) the input VCF comes from one
+    caller only.  Every record is treated as supported (concordance = 1) and
+    is_{caller} = 1 for all callers listed in ``tool_vcfs``; qual_norm values
+    are looked up from the corresponding normalised VCF.  Use this mode when
+    running feature extraction without a prior multi-caller merge step.
 
 Features extracted
 ------------------
@@ -489,8 +496,10 @@ def extract_normalized_features(
         Start, Total_SR, Entropy, MAPQ_Avg, Dual_Split.
         Pass ``None`` (default) when INDELIBLE was not run; the four
         split-read feature columns will be NaN for all records.
-    merger_mode : {'survivor', 'truvari'}
-        How the merged VCF was produced.
+    merger_mode : {'survivor', 'truvari', 'single'}
+        How the merged VCF was produced.  Use ``'single'`` when running
+        feature extraction directly on a single-caller VCF without a prior
+        multi-caller merge step.
     sample_id : str, optional
         Sample identifier (not currently used for feature values but reserved
         for downstream labelling).
@@ -545,6 +554,7 @@ def extract_normalized_features(
         header_order = _caller_order_from_survivor_header(vcf_in.header)
         caller_order = header_order if header_order else list(tool_vcfs.keys())
     else:
+        # truvari and single modes: caller order is simply the tool_vcfs keys.
         caller_order = list(tool_vcfs.keys())
 
     all_records = []
@@ -685,6 +695,45 @@ def extract_normalized_features(
                 v_data.get(f'is_{cn}', 0) for cn in caller_order
             )
 
+        elif merger_mode == 'single':
+            # Single-caller mode: the input VCF is from one caller only.
+            # Every record is treated as supported by all callers in tool_vcfs,
+            # so is_{caller} = 1 and concordance = 1 for each record.
+            for caller_name in caller_order:
+                v_data[f'is_{caller_name}'] = 1
+
+                if caller_name in tools:
+                    matches = list(
+                        tools[caller_name].fetch(
+                            record.chrom, record.pos - 10, record.pos + 10
+                        )
+                    )
+                    if matches:
+                        orig = matches[0]
+                        v_data[f'qual_norm_{caller_name}'] = (
+                            orig.qual if orig.qual is not None else np.nan
+                        )
+
+                        if caller_name == 'xhmm' and 'RD' in orig.info:
+                            v_data['xhmm_rd'] = orig.info['RD']
+                        if caller_name == 'cnvkit':
+                            if 'weight' in orig.info:
+                                v_data['cnvkit_weight'] = orig.info['weight']
+                            if 'log2' in orig.info:
+                                v_data['cnvkit_log2'] = orig.info['log2']
+                        if caller_name == 'dragen':
+                            if 'SM' in orig.info:
+                                v_data['dragen_sm'] = orig.info['SM']
+                            if 'SD' in orig.info:
+                                v_data['dragen_sd'] = orig.info['SD']
+                    else:
+                        v_data[f'qual_norm_{caller_name}'] = np.nan
+                else:
+                    v_data[f'qual_norm_{caller_name}'] = np.nan
+
+            # In single mode all records are supported by the single caller.
+            v_data['concordance'] = 1
+
         # ── aggregate quality summaries across all supporting callers ─────
         # Inspired by CN-Learn's per-caller binary flags but enriched with
         # QUAL_norm: one summary captures the "best" quality signal; the
@@ -754,8 +803,10 @@ def _build_cli_parser():
                         'canoes=sample_CANOES.norm.vcf.gz,'
                         'clamms=sample_CLAMMS.norm.vcf.gz')
     p.add_argument('--merger_mode',       default='survivor',
-                   choices=['survivor', 'truvari'],
-                   help='VCF merge strategy that produced merged_vcf.')
+                   choices=['survivor', 'truvari', 'single'],
+                   help='VCF merge strategy that produced merged_vcf.  '
+                        'Use "single" when running feature extraction on a '
+                        'single-caller VCF without a prior merge step.')
     p.add_argument('--indelible_counts',  default=None,
                    help='INDELIBLE count TSV (Start,Total_SR,Entropy,MAPQ_Avg,'
                         'Dual_Split).  Omit if INDELIBLE was not run.')

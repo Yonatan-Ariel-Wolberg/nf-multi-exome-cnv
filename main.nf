@@ -141,6 +141,80 @@ workflow RUN_TRUVARI {
         TRUVARI(grouped_vcfs)
 }
 
+workflow RUN_SURVIVOR_WITH_FEATURES {
+    take:
+        vcf_ch
+    main:
+        // Require >= 2 caller VCFs per sample for SURVIVOR consensus merging.
+        grouped_vcfs = vcf_ch
+            .groupTuple()
+            .filter { sample_id, vcfs -> vcfs.size() >= 2 }
+
+        SURVIVOR(grouped_vcfs)
+
+        // Map the SURVIVOR union VCF directly into FEATURE_EXTRACTION.
+        // merger_mode is hardcoded to 'survivor' for this combined workflow.
+        feature_inputs = SURVIVOR.out.union_vcf.map { sample_id, merged_vcf ->
+            def parts = []
+            if (params.get('canoes_norm_dir',    false)) parts << "canoes=${params.canoes_norm_dir}/${sample_id}_CANOES.normalised.vcf.gz"
+            if (params.get('clamms_norm_dir',    false)) parts << "clamms=${params.clamms_norm_dir}/${sample_id}_CLAMMS.normalised.vcf.gz"
+            if (params.get('xhmm_norm_dir',      false)) parts << "xhmm=${params.xhmm_norm_dir}/${sample_id}_XHMM.normalised.vcf.gz"
+            if (params.get('cnvkit_norm_dir',    false)) parts << "cnvkit=${params.cnvkit_norm_dir}/${sample_id}_CNVKIT.normalised.vcf.gz"
+            if (params.get('gcnv_norm_dir',      false)) parts << "gatk_gcnv=${params.gcnv_norm_dir}/${sample_id}_GCNV.normalised.vcf.gz"
+            if (params.get('dragen_norm_dir',    false)) parts << "dragen=${params.dragen_norm_dir}/${sample_id}_DRAGEN.normalised.vcf.gz"
+            if (params.get('indelible_norm_dir', false)) parts << "indelible=${params.indelible_norm_dir}/${sample_id}_INDELIBLE.normalised.vcf.gz"
+            def tool_vcfs_str = parts.join(',')
+
+            def bam_f       = params.get('bam_file',         false) ? file(params.bam_file)         : []
+            def fasta_f     = params.get('reference_fasta',  false) ? file(params.reference_fasta)  : []
+            def bed_f       = params.get('bed_file',         false) ? file(params.bed_file)         : []
+            def map_f       = params.get('mappability_file', false) ? file(params.mappability_file) : []
+            def indelible_f = params.get('indelible_counts', false) ? file(params.indelible_counts) : []
+
+            return [sample_id, merged_vcf, tool_vcfs_str, 'survivor',
+                    bam_f, fasta_f, bed_f, map_f, indelible_f]
+        }
+
+        FEATURE_EXTRACTION(feature_inputs)
+}
+
+workflow RUN_TRUVARI_WITH_FEATURES {
+    take:
+        vcf_ch
+    main:
+        // Require >= 2 caller VCFs per sample for Truvari consensus merging.
+        grouped_vcfs = vcf_ch
+            .groupTuple()
+            .filter { sample_id, vcfs -> vcfs.size() >= 2 }
+
+        TRUVARI(grouped_vcfs)
+
+        // Map the Truvari merged VCF directly into FEATURE_EXTRACTION.
+        // merger_mode is hardcoded to 'truvari' for this combined workflow.
+        feature_inputs = TRUVARI.out.merged_vcf.map { sample_id, merged_vcf ->
+            def parts = []
+            if (params.get('canoes_norm_dir',    false)) parts << "canoes=${params.canoes_norm_dir}/${sample_id}_CANOES.normalised.vcf.gz"
+            if (params.get('clamms_norm_dir',    false)) parts << "clamms=${params.clamms_norm_dir}/${sample_id}_CLAMMS.normalised.vcf.gz"
+            if (params.get('xhmm_norm_dir',      false)) parts << "xhmm=${params.xhmm_norm_dir}/${sample_id}_XHMM.normalised.vcf.gz"
+            if (params.get('cnvkit_norm_dir',    false)) parts << "cnvkit=${params.cnvkit_norm_dir}/${sample_id}_CNVKIT.normalised.vcf.gz"
+            if (params.get('gcnv_norm_dir',      false)) parts << "gatk_gcnv=${params.gcnv_norm_dir}/${sample_id}_GCNV.normalised.vcf.gz"
+            if (params.get('dragen_norm_dir',    false)) parts << "dragen=${params.dragen_norm_dir}/${sample_id}_DRAGEN.normalised.vcf.gz"
+            if (params.get('indelible_norm_dir', false)) parts << "indelible=${params.indelible_norm_dir}/${sample_id}_INDELIBLE.normalised.vcf.gz"
+            def tool_vcfs_str = parts.join(',')
+
+            def bam_f       = params.get('bam_file',         false) ? file(params.bam_file)         : []
+            def fasta_f     = params.get('reference_fasta',  false) ? file(params.reference_fasta)  : []
+            def bed_f       = params.get('bed_file',         false) ? file(params.bed_file)         : []
+            def map_f       = params.get('mappability_file', false) ? file(params.mappability_file) : []
+            def indelible_f = params.get('indelible_counts', false) ? file(params.indelible_counts) : []
+
+            return [sample_id, merged_vcf, tool_vcfs_str, 'truvari',
+                    bam_f, fasta_f, bed_f, map_f, indelible_f]
+        }
+
+        FEATURE_EXTRACTION(feature_inputs)
+}
+
 workflow RUN_FEATURE_EXTRACTION {
     take:
         // Channel of tuples:
@@ -276,20 +350,61 @@ workflow {
 
         case['feature_extraction']:
             // Run feature extraction on an already-produced merged VCF.
-            // Required: --merged_vcf_dir  (directory containing <sample_id>_survivor_union.vcf
-            //                              or <sample_id>_truvari_merged.vcf files)
+            // Required: --merged_vcf_dir  (directory containing <sample_id>_survivor_union.vcf,
+            //                              <sample_id>_truvari_merged.vcf, or any *.vcf* when
+            //                              --merger_mode 'single' is used for single-caller VCFs.
+            //                              In single mode VCF filenames must include a caller-name
+            //                              suffix such as _CANOES, _CLAMMS, _XHMM, _CNVKIT, _GCNV,
+            //                              _DRAGEN, or _INDELIBLE so that the sample ID can be
+            //                              extracted correctly, e.g. SAMPLE01_CANOES_output.vcf)
             // Optional annotation params (any subset may be omitted):
             //   --canoes_norm_dir, --clamms_norm_dir, --xhmm_norm_dir, --cnvkit_norm_dir,
             //   --gcnv_norm_dir, --dragen_norm_dir, --indelible_norm_dir
             //   --bam_file, --reference_fasta, --bed_file, --mappability_file,
-            //   --indelible_counts, --merger_mode (default: survivor)
-            def vcf_pattern = params.get('merger_mode', 'survivor') == 'truvari'
-                ? params.merged_vcf_dir + '/**/*truvari*.vcf*'
-                : params.merged_vcf_dir + '/**/*survivor*.vcf*'
+            //   --indelible_counts
+            //   --merger_mode (default: 'survivor'; also 'truvari' or 'single')
+            def merger_mode_fe = params.get('merger_mode', 'survivor')
+            def vcf_pattern
+            if (merger_mode_fe == 'truvari') {
+                vcf_pattern = params.merged_vcf_dir + '/**/*truvari*.vcf*'
+            } else if (merger_mode_fe == 'single') {
+                // Single-caller mode: collect any *.vcf* from the directory;
+                // sample ID is extracted by stripping the caller-name suffix.
+                vcf_pattern = params.merged_vcf_dir + '/**/*.vcf*'
+            } else {
+                vcf_pattern = params.merged_vcf_dir + '/**/*survivor*.vcf*'
+            }
             Channel.fromPath(vcf_pattern)
-                .map { f -> [f.name.replaceAll(/_survivor.*|_truvari.*/, '').replaceAll(/\.vcf(\.gz)?$/i, ''), f] }
+                .map { f ->
+                    def sample_id
+                    if (merger_mode_fe == 'single') {
+                        // Strip caller-name suffix (e.g. _CANOES_output) then .vcf[.gz]
+                        sample_id = f.name
+                            .replaceAll(/_(CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*/, '')
+                            .replaceAll(/\.vcf(\.gz)?$/i, '')
+                    } else {
+                        sample_id = f.name.replaceAll(/_survivor.*|_truvari.*/, '').replaceAll(/\.vcf(\.gz)?$/i, '')
+                    }
+                    [sample_id, f]
+                }
                 .set { ch_merged }
             RUN_FEATURE_EXTRACTION(ch_merged)
+            break
+
+        case['survivor_features']:
+            // End-to-end: gather caller VCFs → SURVIVOR consensus merge → feature extraction.
+            // Requires the same caller directory params as the 'survivor' workflow, plus
+            // the optional annotation params accepted by the 'feature_extraction' workflow.
+            def ch_vcfs_sf = gather_vcfs()
+            RUN_SURVIVOR_WITH_FEATURES(ch_vcfs_sf)
+            break
+
+        case['truvari_features']:
+            // End-to-end: gather caller VCFs → Truvari consensus merge → feature extraction.
+            // Requires the same caller directory params as the 'truvari' workflow, plus
+            // the optional annotation params accepted by the 'feature_extraction' workflow.
+            def ch_vcfs_tf = gather_vcfs()
+            RUN_TRUVARI_WITH_FEATURES(ch_vcfs_tf)
             break
 
         default:
@@ -308,6 +423,8 @@ Please use one of the following options for workflows:
     --workflow survivor     
     --workflow truvari
     --workflow feature_extraction
+    --workflow survivor_features
+    --workflow truvari_features
 """
             break
     }

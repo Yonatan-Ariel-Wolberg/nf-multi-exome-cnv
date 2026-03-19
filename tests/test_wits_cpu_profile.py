@@ -498,7 +498,8 @@ class TestBindPaths:
 
 WITS_WORKFLOWS = [
     'canoes', 'clamms', 'cnvkit', 'gatk-gcnv',
-    'icav2-dragen', 'indelible', 'survivor', 'truvari', 'xhmm',
+    'icav2-dragen', 'indelible', 'survivor', 'survivor-features',
+    'truvari', 'truvari-features', 'xhmm',
 ]
 
 PARAMS_CANOES_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'params-canoes-wits.json')

@@ -1,0 +1,23 @@
+{
+    "workflow": "survivor_features",
+    "outdir": "./results",
+
+    "bind_paths":    "/dataB/aux,/dataG/ddd,/dataG/ddd-2023,/home/ywolberg",
+    "runOptions":    "",
+
+    "canoes_dir":    "./results/out_CANOES/vcfs",
+    "clamms_dir":    "./results/out_CLAMMS/vcfs",
+    "xhmm_dir":      "./results/out_XHMM",
+    "cnvkit_dir":    "./results/out_CNVKIT/vcfs",
+    "gcnv_dir":      "./results/out_GCNV/vcfs",
+    "dragen_dir":    "./results/out_DRAGEN/vcfs",
+    "indelible_dir": "./results/out_INDELIBLE/vcfs",
+
+    "canoes_norm_dir":    "./results/out_CANOES/normalised",
+    "clamms_norm_dir":    "./results/out_CLAMMS/normalised",
+    "xhmm_norm_dir":      "./results/out_XHMM/normalised",
+    "cnvkit_norm_dir":    "./results/out_CNVKIT/normalised",
+    "gcnv_norm_dir":      "./results/out_GCNV/normalised",
+    "dragen_norm_dir":    "./results/out_DRAGEN/normalised",
+    "indelible_norm_dir": "./results/out_INDELIBLE/normalised"
+}

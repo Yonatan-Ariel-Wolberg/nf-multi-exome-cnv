@@ -1,21 +1,25 @@
 #!/usr/bin/env python3
 """
-Integration tests for main.nf – verifies that all 9 workflow cases are
+Integration tests for main.nf – verifies that all workflow cases are
 wired correctly and that all supporting files are coherent.
 
 Covers:
-  1. All 9 workflow modules are included (INDELIBLE, CANOES, XHMM, CLAMMS,
-     DRAGEN, CNVKIT, GATK_GCNV, SURVIVOR, TRUVARI).
+  1. All workflow modules are included (INDELIBLE, CANOES, XHMM, CLAMMS,
+     DRAGEN, CNVKIT, GATK_GCNV, SURVIVOR, TRUVARI, FEATURE_EXTRACTION).
   2. Every workflow case is present in the switch block:
-     indelible, canoes, xhmm, clamms, dragen, cnvkit, gcnv, survivor, truvari.
+     indelible, canoes, xhmm, clamms, dragen, cnvkit, gcnv, survivor, truvari,
+     survivor_with_features, truvari_with_features, feature_extraction.
   3. gather_vcfs() checks for at least 2 caller directories before continuing.
   4. The get_id closure strips caller name suffixes and .vcf/.vcf.gz extensions
      from filenames to recover the bare sample ID.
   5. RUN_SURVIVOR and RUN_TRUVARI filter samples that have fewer than 2 VCFs
      (so only samples covered by ≥2 callers enter consensus steps).
-  6. All 9 params JSON files exist in params/ and contain valid JSON with the
+  6. All params JSON files exist in params/ and contain valid JSON with the
      correct "workflow" key.
-  7. Each params JSON references a workflow name that matches one of the 9 cases.
+  7. Each params JSON references a workflow name that matches one of the cases.
+  8. survivor_with_features and truvari_with_features end-to-end workflows
+     are properly wired (gather → merge → feature extraction).
+  9. feature_extraction case auto-discovers the collapsed VCF in Truvari mode.
 """
 
 import json
@@ -29,7 +33,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 MAIN_NF = os.path.join(REPO_ROOT, "main.nf")
 PARAMS_DIR = os.path.join(REPO_ROOT, "params")
 
-# All 9 supported workflow names
+# All supported caller workflow names (original 9)
 ALL_WORKFLOWS = [
     "indelible",
     "canoes",
@@ -42,30 +46,39 @@ ALL_WORKFLOWS = [
     "truvari",
 ]
 
+# Combined end-to-end workflow names (new)
+COMBINED_WORKFLOWS = [
+    "survivor_with_features",
+    "truvari_with_features",
+]
+
 # Mapping from workflow name to expected params JSON filename
 PARAMS_FILES = {
-    "indelible": "params-indelible.json",
-    "canoes":    "params-canoes.json",
-    "xhmm":      "params-xhmm.json",
-    "clamms":    "params-clamms.json",
-    "dragen":    "params-icav2-dragen.json",
-    "cnvkit":    "params-cnvkit.json",
-    "gcnv":      "params-gatk-gcnv.json",
-    "survivor":  "params-survivor.json",
-    "truvari":   "params-truvari.json",
+    "indelible":               "params-indelible.json",
+    "canoes":                  "params-canoes.json",
+    "xhmm":                    "params-xhmm.json",
+    "clamms":                  "params-clamms.json",
+    "dragen":                  "params-icav2-dragen.json",
+    "cnvkit":                  "params-cnvkit.json",
+    "gcnv":                    "params-gatk-gcnv.json",
+    "survivor":                "params-survivor.json",
+    "truvari":                 "params-truvari.json",
+    "survivor_with_features":  "params-survivor-with-features.json",
+    "truvari_with_features":   "params-truvari-with-features.json",
 }
 
 # Module names expected in include statements
 MODULE_INCLUDES = {
-    "INDELIBLE": "modules-indelible.nf",
-    "CANOES":    "modules-canoes.nf",
-    "XHMM":      "modules-xhmm.nf",
-    "CLAMMS":    "modules-clamms.nf",
-    "DRAGEN":    "modules-icav2-dragen.nf",
-    "CNVKIT":    "modules-cnvkit.nf",
-    "GATK_GCNV": "modules-gatk-gcnv.nf",
-    "SURVIVOR":  "modules-survivor.nf",
-    "TRUVARI":   "modules-truvari.nf",
+    "INDELIBLE":          "modules-indelible.nf",
+    "CANOES":             "modules-canoes.nf",
+    "XHMM":               "modules-xhmm.nf",
+    "CLAMMS":             "modules-clamms.nf",
+    "DRAGEN":             "modules-icav2-dragen.nf",
+    "CNVKIT":             "modules-cnvkit.nf",
+    "GATK_GCNV":          "modules-gatk-gcnv.nf",
+    "SURVIVOR":           "modules-survivor.nf",
+    "TRUVARI":            "modules-truvari.nf",
+    "FEATURE_EXTRACTION": "modules-feature-extraction.nf",
 }
 
 
@@ -98,11 +111,11 @@ def main_text():
 # ===========================================================================
 
 class TestModuleIncludes:
-    """main.nf must include all 9 workflow modules."""
+    """main.nf must include all required workflow modules."""
 
     @pytest.mark.parametrize("workflow_name,module_file", MODULE_INCLUDES.items())
     def test_include_present(self, main_text, workflow_name, module_file):
-        """Each of the 9 modules must be imported via an include statement."""
+        """Each module must be imported via an include statement."""
         assert f"include {{ {workflow_name} }}" in main_text, (
             f"main.nf must include {{ {workflow_name} }} from ./modules/{module_file}"
         )
@@ -116,9 +129,9 @@ class TestModuleIncludes:
 # ===========================================================================
 
 class TestWorkflowSwitchCases:
-    """The workflow switch block must handle all 9 workflow modes."""
+    """The workflow switch block must handle all workflow modes."""
 
-    @pytest.mark.parametrize("workflow_case", ALL_WORKFLOWS)
+    @pytest.mark.parametrize("workflow_case", ALL_WORKFLOWS + COMBINED_WORKFLOWS)
     def test_case_present(self, main_text, workflow_case):
         """Every workflow mode must have a case in the switch block."""
         # case['indelible'] style
@@ -132,8 +145,8 @@ class TestWorkflowSwitchCases:
         assert "default:" in main_text, (
             "main.nf switch block must contain a default: case"
         )
-        # The default case must list all workflow options
-        for wf in ALL_WORKFLOWS:
+        # The default case must list all workflow options (original 9 + new combined modes)
+        for wf in ALL_WORKFLOWS + COMBINED_WORKFLOWS:
             assert f"--workflow {wf}" in main_text, (
                 f"The default error message must list '--workflow {wf}' as a valid option"
             )
@@ -144,16 +157,15 @@ class TestWorkflowSwitchCases:
 # ===========================================================================
 
 class TestSubWorkflowDefinitions:
-    """main.nf must define a RUN_* sub-workflow for each of the 9 callers."""
+    """main.nf must define a RUN_* sub-workflow for each workflow mode."""
 
-    @pytest.mark.parametrize("workflow_case", ALL_WORKFLOWS)
+    @pytest.mark.parametrize("workflow_case", ALL_WORKFLOWS + COMBINED_WORKFLOWS)
     def test_run_workflow_defined(self, main_text, workflow_case):
-        """Each caller must have a corresponding RUN_<WORKFLOW> sub-workflow."""
+        """Each workflow must have a corresponding RUN_<WORKFLOW> sub-workflow."""
         expected_name = f"RUN_{workflow_case.upper()}"
-        # gcnv → RUN_GCNV
         assert f"workflow {expected_name}" in main_text, (
             f"main.nf must define 'workflow {expected_name}' as a sub-workflow "
-            f"for the {workflow_case} caller"
+            f"for the {workflow_case} mode"
         )
 
 
@@ -440,9 +452,11 @@ class TestParamsJsonFiles:
     @pytest.mark.parametrize("filename", [
         "params-survivor.json",
         "params-truvari.json",
+        "params-survivor-with-features.json",
+        "params-truvari-with-features.json",
     ])
     def test_consensus_params_have_caller_dirs(self, filename):
-        """Consensus params files (survivor, truvari) must specify at least one caller dir."""
+        """Consensus params files must specify at least two caller dirs."""
         path = os.path.join(PARAMS_DIR, filename)
         if not os.path.isfile(path):
             pytest.skip(f"{filename} does not exist")
@@ -456,6 +470,21 @@ class TestParamsJsonFiles:
             f"params/{filename} must specify at least two caller_dir keys "
             f"(e.g. canoes_dir, clamms_dir) so gather_vcfs() has enough inputs. "
             f"Found: {found}"
+        )
+
+    @pytest.mark.parametrize("filename", [
+        "params-survivor-with-features.json",
+        "params-truvari-with-features.json",
+    ])
+    def test_combined_params_have_merger_mode(self, filename):
+        """Combined workflow params files must include a merger_mode key."""
+        path = os.path.join(PARAMS_DIR, filename)
+        if not os.path.isfile(path):
+            pytest.skip(f"{filename} does not exist")
+        data = _load_params(filename)
+        assert "merger_mode" in data, (
+            f"params/{filename} must contain 'merger_mode' to tell "
+            f"feature_extraction.py how the VCFs were merged"
         )
 
 
@@ -476,4 +505,164 @@ class TestDsl2Declaration:
         """main.nf must start with a Nextflow shebang line."""
         assert main_text.startswith("#!/usr/bin/env nextflow"), (
             "main.nf must start with '#!/usr/bin/env nextflow'"
+        )
+
+
+# ===========================================================================
+# 8. Combined end-to-end workflow wiring
+# ===========================================================================
+
+class TestCombinedWorkflowWiring:
+    """RUN_SURVIVOR_WITH_FEATURES and RUN_TRUVARI_WITH_FEATURES must call
+    both the consensus module and FEATURE_EXTRACTION in sequence."""
+
+    def _get_workflow_body(self, main_text, name):
+        m = re.search(
+            rf"workflow {name}\s*\{{(.+?)(?=\nworkflow |\Z)",
+            main_text,
+            re.DOTALL,
+        )
+        assert m, f"workflow {name} not found in main.nf"
+        return m.group(1)
+
+    def test_run_survivor_with_features_calls_survivor(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_SURVIVOR_WITH_FEATURES")
+        assert "SURVIVOR(" in body, (
+            "RUN_SURVIVOR_WITH_FEATURES must call the SURVIVOR workflow"
+        )
+
+    def test_run_survivor_with_features_calls_feature_extraction(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_SURVIVOR_WITH_FEATURES")
+        assert "FEATURE_EXTRACTION(" in body, (
+            "RUN_SURVIVOR_WITH_FEATURES must call FEATURE_EXTRACTION after SURVIVOR"
+        )
+
+    def test_run_survivor_with_features_passes_union_vcf(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_SURVIVOR_WITH_FEATURES")
+        assert "union_vcf" in body, (
+            "RUN_SURVIVOR_WITH_FEATURES must use SURVIVOR.out.union_vcf "
+            "as input to feature extraction"
+        )
+
+    def test_run_survivor_with_features_filters_min_two_callers(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_SURVIVOR_WITH_FEATURES")
+        assert "vcfs.size() >= 2" in body, (
+            "RUN_SURVIVOR_WITH_FEATURES must filter samples with < 2 caller VCFs"
+        )
+
+    def test_run_truvari_with_features_calls_truvari(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_TRUVARI_WITH_FEATURES")
+        assert "TRUVARI(" in body, (
+            "RUN_TRUVARI_WITH_FEATURES must call the TRUVARI workflow"
+        )
+
+    def test_run_truvari_with_features_calls_feature_extraction(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_TRUVARI_WITH_FEATURES")
+        assert "FEATURE_EXTRACTION(" in body, (
+            "RUN_TRUVARI_WITH_FEATURES must call FEATURE_EXTRACTION after TRUVARI"
+        )
+
+    def test_run_truvari_with_features_joins_collapsed_vcf(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_TRUVARI_WITH_FEATURES")
+        assert "collapsed_vcf" in body, (
+            "RUN_TRUVARI_WITH_FEATURES must pass the collapsed VCF to feature extraction"
+        )
+
+    def test_run_truvari_with_features_joins_merged_and_collapsed(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_TRUVARI_WITH_FEATURES")
+        assert ".join(" in body, (
+            "RUN_TRUVARI_WITH_FEATURES must join merged_vcf and collapsed_vcf "
+            "channels by sample_id before building feature inputs"
+        )
+
+    def test_run_truvari_with_features_filters_min_two_callers(self, main_text):
+        body = self._get_workflow_body(main_text, "RUN_TRUVARI_WITH_FEATURES")
+        assert "vcfs.size() >= 2" in body, (
+            "RUN_TRUVARI_WITH_FEATURES must filter samples with < 2 caller VCFs"
+        )
+
+    def test_survivor_with_features_case_calls_gather_vcfs(self, main_text):
+        case_block = re.search(
+            r"case\['survivor_with_features'\](.+?)break",
+            main_text,
+            re.DOTALL,
+        )
+        assert case_block, "case['survivor_with_features'] block not found"
+        assert "gather_vcfs()" in case_block.group(1), (
+            "case['survivor_with_features'] must call gather_vcfs()"
+        )
+
+    def test_truvari_with_features_case_calls_gather_vcfs(self, main_text):
+        case_block = re.search(
+            r"case\['truvari_with_features'\](.+?)break",
+            main_text,
+            re.DOTALL,
+        )
+        assert case_block, "case['truvari_with_features'] block not found"
+        assert "gather_vcfs()" in case_block.group(1), (
+            "case['truvari_with_features'] must call gather_vcfs()"
+        )
+
+
+# ===========================================================================
+# 9. feature_extraction case: Truvari auto-discovery of collapsed VCF
+# ===========================================================================
+
+class TestFeatureExtractionCase:
+    """The feature_extraction switch case must handle both merger modes and
+    auto-discover the Truvari collapsed VCF alongside the merged VCF."""
+
+    def _get_case_body(self, main_text, case_name):
+        m = re.search(
+            rf"case\['{re.escape(case_name)}'\](.+?)break",
+            main_text,
+            re.DOTALL,
+        )
+        assert m, f"case['{case_name}'] block not found in main.nf"
+        return m.group(1)
+
+    def test_feature_extraction_case_exists(self, main_text):
+        assert "case['feature_extraction']" in main_text
+
+    def test_feature_extraction_handles_truvari_mode(self, main_text):
+        body = self._get_case_body(main_text, "feature_extraction")
+        assert "truvari" in body, (
+            "case['feature_extraction'] must handle merger_mode='truvari'"
+        )
+
+    def test_feature_extraction_discovers_collapsed_vcf_in_truvari_mode(self, main_text):
+        body = self._get_case_body(main_text, "feature_extraction")
+        assert "_truvari_collapsed.vcf" in body, (
+            "case['feature_extraction'] in truvari mode must auto-discover "
+            "<sample_id>_truvari_collapsed.vcf alongside the merged VCF"
+        )
+
+    def test_feature_extraction_uses_build_feature_inputs(self, main_text):
+        body = self._get_case_body(main_text, "feature_extraction")
+        assert "build_feature_inputs(" in body, (
+            "case['feature_extraction'] must use build_feature_inputs() "
+            "to construct the full 10-element feature input tuple"
+        )
+
+    def test_feature_extraction_passes_empty_collapsed_in_survivor_mode(self, main_text):
+        body = self._get_case_body(main_text, "feature_extraction")
+        # In survivor mode the collapsed_vcf slot must be [] (empty list)
+        assert "build_feature_inputs(sample_id, f, [])" in body or \
+               "build_feature_inputs(sample_id, merged_vcf, [])" in body, (
+            "case['feature_extraction'] in survivor mode must pass [] "
+            "as collapsed_vcf to build_feature_inputs()"
+        )
+
+    def test_feature_extraction_survivor_pattern_matches_union_vcf(self, main_text):
+        body = self._get_case_body(main_text, "feature_extraction")
+        assert "_survivor_union.vcf" in body, (
+            "case['feature_extraction'] in survivor mode must glob for "
+            "*_survivor_union.vcf* files"
+        )
+
+    def test_feature_extraction_truvari_pattern_matches_merged_vcf(self, main_text):
+        body = self._get_case_body(main_text, "feature_extraction")
+        assert "_truvari_merged.vcf" in body, (
+            "case['feature_extraction'] in truvari mode must glob for "
+            "*_truvari_merged.vcf* files"
         )

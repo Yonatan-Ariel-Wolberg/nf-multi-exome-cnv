@@ -19,6 +19,7 @@ Usage:
 """
 
 import argparse
+import math
 import sys
 
 import pandas as pd
@@ -84,16 +85,26 @@ def categorize_probes(probes, truth_cnv, callset_cnv):
     return categorized
 
 
-def compute_metrics(categorized):
+def compute_metrics(categorized, beta=2):
     TP = len(categorized['TP'])
     FN = len(categorized['FN'])
     FP = len(categorized['FP'])
     TN = len(categorized['TN'])
 
     sensitivity = TP / (TP + FN) if (TP + FN) > 0 else 0
-    precision = TP / (TP + FP) if (TP + FP) > 0 else 0
+    precision   = TP / (TP + FP) if (TP + FP) > 0 else 0
+    specificity = TN / (TN + FP) if (TN + FP) > 0 else 0
 
-    return sensitivity, precision, TN
+    f_beta_denom = (beta ** 2 * precision) + sensitivity
+    f_beta = (1 + beta ** 2) * (precision * sensitivity) / f_beta_denom \
+        if f_beta_denom > 0 else 0
+
+    mcc_denom = math.sqrt(
+        (TP + FP) * (TP + FN) * (TN + FP) * (TN + FN)
+    )
+    mcc = ((TP * TN) - (FP * FN)) / mcc_denom if mcc_denom > 0 else 0
+
+    return sensitivity, precision, TP, TN, FP, FN, specificity, f_beta, mcc
 
 
 def main():
@@ -114,11 +125,20 @@ def main():
     callset_cnv = load_cnv_file(args.callset_bed)
 
     categorized = categorize_probes(probes, truth_cnv, callset_cnv)
-    sensitivity, precision, TN = compute_metrics(categorized)
+    sensitivity, precision, TP, TN, FP, FN, specificity, f_beta, mcc = \
+        compute_metrics(categorized)
 
     lines = [
+        "Confusion Matrix:",
+        f"  TP: {TP}",
+        f"  FP: {FP}",
+        f"  FN: {FN}",
+        f"  TN: {TN}",
         f"Sensitivity: {sensitivity}",
         f"Precision: {precision}",
+        f"Specificity: {specificity}",
+        f"F_beta (beta=2): {f_beta}",
+        f"Matthews Correlation Coefficient: {mcc}",
         f"True Negatives: {TN}",
     ]
 

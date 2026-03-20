@@ -54,11 +54,16 @@ consensus and ML stages.
 4. **MERGE_READ_COUNTS** – Merge per-batch matrices into a single cohort-wide
    read-count matrix.
 5. **RUN_CANOES** – Normalise read counts by mean coverage, select and weight
-   reference samples using non-negative least squares (NNLS), estimate
-   per-probe variance with a GAM (GC content as covariate), compute Negative
-   Binomial emission probabilities for deletion/normal/duplication states, and
-   call CNVs with the Viterbi algorithm; Phred-scaled quality scores (Q_SOME,
-   Q_EXACT) are produced via the forward–backward algorithm.
+   reference samples using non-negative least squares (NNLS), and estimate
+   per-probe variance with a GAM (GC content as covariate).  CNVs are then
+   called using a **Hidden Markov Model (HMM) in which the Negative Binomial
+   distribution serves as the emission model**: for each probe, `dnbinom` log-
+   probabilities are computed under the deletion (CN=1), normal (CN=2), and
+   duplication (CN=3) states and passed directly into the Viterbi decoder — the
+   Negative Binomial and the HMM are therefore a single integrated model, not
+   separate steps.  The Phred-scaled quality score Q_SOME (probability that the
+   CNV event exists) is computed via the forward–backward algorithm using the
+   same emission probabilities.
 6. **FILTER_CANOES_CNVS** – Apply quality thresholds to remove low-confidence
    calls.
 7. **CONVERT_CANOES_TO_VCF** – Convert the filtered CSV output to VCF format,
@@ -446,8 +451,11 @@ memory and file-descriptor limits.  The pipeline therefore splits the BAM list
 into fixed-size batches (`canoes_batch_size`) and runs one `multicov` job per
 batch per chromosome; the per-batch matrices are then merged into a single
 cohort-wide matrix **before** the CANOES R script normalises read counts,
-selects reference samples via NNLS, and calls CNVs using a Negative Binomial
-HMM.  The batch size therefore controls **only parallelism and
+selects reference samples via NNLS, and calls CNVs using an HMM in which the
+Negative Binomial distribution is the integrated emission model (the NB
+log-probabilities are fed directly into the Viterbi decoder — they are a
+single combined model, not separate steps).  The batch size therefore controls
+**only parallelism and
 memory use**, not normalisation accuracy — every sample contributes to the
 final normalisation regardless of batch size.
 

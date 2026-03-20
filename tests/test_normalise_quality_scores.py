@@ -464,3 +464,125 @@ class TestNextflowConfigPysamLabel:
         assert 'pysam' in block.lower(), (
             "The 'pysam' container image path/URI must reference pysam"
         )
+
+
+# ===========================================================================
+# 6. DRAGEN QUAL normalisation chain
+# ===========================================================================
+
+class TestDragenQualNormalisationChain:
+    """Verify the DRAGEN-specific QUAL normalisation chain in the script.
+
+    DRAGEN CNV VCFs produced by DRAGEN Germline Enrichment carry native QUAL
+    values (QUAL_{native}) in the QUAL column and have not been INFO-tagged.
+    After the processing chain the VCF must:
+      1. Be INFO-tagged with TOOL=DRAGEN.
+      2. Be bgzipped, bcftools-sorted, and tabix-indexed.
+      3. Have QUAL replaced with the normalised score (Q_norm).
+      4. Have the original QUAL preserved in the FORMAT/SAMPLE field OQ.
+      5. Have OAS set to "QUAL" to record which metric was normalised.
+    """
+
+    def _dragen_block(self, script_text):
+        m = re.search(
+            r'elif caller == "DRAGEN":(.+?)(?=\nelif caller |\nexcept |\Z)',
+            script_text, re.DOTALL,
+        )
+        assert m, "DRAGEN caller block not found in normalise_cnv_caller_quality_scores.py"
+        return m.group(1)
+
+    # -------------------------------------------------------------------------
+    # OQ / OAS FORMAT headers must be declared so pysam can write them
+    # -------------------------------------------------------------------------
+
+    def test_oq_format_header_declared(self, script_text):
+        """Script must declare an OQ FORMAT header to store the original QUAL."""
+        assert '"OQ"' in script_text or "'OQ'" in script_text, (
+            "normalise_cnv_caller_quality_scores.py must declare "
+            "vcf.header.formats.add('OQ', ...) to carry the original QUAL value "
+            "in the FORMAT/SAMPLE field of every normalised record"
+        )
+
+    def test_oas_format_header_declared(self, script_text):
+        """Script must declare an OAS FORMAT header to store the metric name."""
+        assert '"OAS"' in script_text or "'OAS'" in script_text, (
+            "normalise_cnv_caller_quality_scores.py must declare "
+            "vcf.header.formats.add('OAS', ...) to record which metric was used"
+        )
+
+    # -------------------------------------------------------------------------
+    # Original QUAL is moved to OQ before being cleared
+    # -------------------------------------------------------------------------
+
+    def test_original_qual_moved_to_oq_format_field(self, script_text):
+        """The script must store orig_qual in sample['OQ'] before clearing QUAL."""
+        assert 'sample["OQ"]' in script_text or "sample['OQ']" in script_text, (
+            "normalise_cnv_caller_quality_scores.py must assign sample['OQ'] = orig_qual "
+            "so the original QUAL_{native} is preserved in the FORMAT/SAMPLE field"
+        )
+
+    def test_qual_cleared_before_normalisation(self, script_text):
+        """QUAL must be explicitly cleared (set to None) before writing the normalised value."""
+        assert 'record.qual = None' in script_text, (
+            "normalise_cnv_caller_quality_scores.py must set record.qual = None "
+            "after saving orig_qual to OQ, so the QUAL field is properly replaced "
+            "with the normalised score"
+        )
+
+    def test_normalised_qual_replaces_qual_field(self, script_text):
+        """record.qual must be assigned the normalised score after the caller block."""
+        assert 'record.qual = round(qual_norm' in script_text, (
+            "normalise_cnv_caller_quality_scores.py must assign "
+            "record.qual = round(qual_norm, ...) to replace the native QUAL with Q_norm"
+        )
+
+    # -------------------------------------------------------------------------
+    # DRAGEN block reads from record.qual, not FORMAT fields
+    # -------------------------------------------------------------------------
+
+    def test_dragen_reads_from_record_qual_not_format(self, script_text):
+        """DRAGEN block must use orig_qual (from record.qual), not sample FORMAT fields."""
+        block = self._dragen_block(script_text)
+        # orig_qual was captured from record.qual before the caller section
+        assert 'orig_qual' in block, (
+            "DRAGEN caller block must read from orig_qual (i.e. record.qual), "
+            "not from sample FORMAT fields; DRAGEN stores the quality score in QUAL"
+        )
+
+    def test_dragen_does_not_read_format_fields_for_qual(self, script_text):
+        """DRAGEN block must not extract quality from a FORMAT field."""
+        block = self._dragen_block(script_text)
+        # DRAGEN QUAL is in the record QUAL column, not in FORMAT subfields like Q_SOME
+        for field in ('"Q_SOME"', '"SQ"', '"CNQ"', '"QS"'):
+            assert field not in block, (
+                f"DRAGEN caller block must not use FORMAT field {field} for quality "
+                "normalisation; DRAGEN stores the score in the QUAL column"
+            )
+
+    # -------------------------------------------------------------------------
+    # DRAGEN metric_used = "QUAL" → written to OAS
+    # -------------------------------------------------------------------------
+
+    def test_dragen_metric_used_is_qual(self, script_text):
+        """DRAGEN block must set metric_used = 'QUAL'."""
+        block = self._dragen_block(script_text)
+        assert 'metric_used = "QUAL"' in block or "metric_used = 'QUAL'" in block, (
+            "DRAGEN caller block must set metric_used = 'QUAL' so that OAS records "
+            "which score was used for normalisation"
+        )
+
+    # -------------------------------------------------------------------------
+    # DRAGEN only normalises PASS records
+    # -------------------------------------------------------------------------
+
+    def test_dragen_gates_on_pass_filter(self, script_text):
+        """DRAGEN block must only normalise records whose FILTER contains PASS."""
+        block = self._dragen_block(script_text)
+        assert 'PASS' in block, (
+            "DRAGEN caller block must check that the record has a PASS filter "
+            "before normalising QUAL; non-PASS records receive qual_norm = 0.0"
+        )
+        assert 'record.filter' in block, (
+            "DRAGEN caller block must inspect record.filter to determine "
+            "whether the record has passed variant-calling filters"
+        )

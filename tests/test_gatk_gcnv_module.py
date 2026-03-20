@@ -370,3 +370,74 @@ class TestWorkflowOrdering:
                 "Replace .toList() with .toSortedList() for the indexed samples channel "
                 "to guarantee consistent sample indexing."
             )
+
+
+# ===========================================================================
+# 7. NORMALISE_CNV_QUALITY_SCORES: shared process from modules-common.nf
+# ===========================================================================
+
+class TestNormaliseProcess:
+    """NORMALISE_CNV_QUALITY_SCORES must be imported from modules-common.nf,
+    not redefined locally in the GATK module."""
+
+    def test_normalise_process_not_defined_locally(self, module_text):
+        """The GATK module must not contain a local definition of
+        NORMALISE_CNV_QUALITY_SCORES; it should be included from modules-common.nf."""
+        # Count how many times 'process NORMALISE_CNV_QUALITY_SCORES' appears
+        local_defs = re.findall(r"^\s*process\s+NORMALISE_CNV_QUALITY_SCORES\b", module_text, re.MULTILINE)
+        assert len(local_defs) == 0, (
+            "NORMALISE_CNV_QUALITY_SCORES must not be defined locally in the GATK "
+            "module; include it from modules-common.nf instead."
+        )
+
+    def test_normalise_included_from_common(self, module_text):
+        """NORMALISE_CNV_QUALITY_SCORES must be included from modules-common.nf."""
+        assert re.search(
+            r"include\s*\{[^}]*NORMALISE_CNV_QUALITY_SCORES[^}]*\}.*modules-common\.nf",
+            module_text,
+        ), (
+            "modules-gatk-gcnv.nf must include NORMALISE_CNV_QUALITY_SCORES "
+            "from ./modules-common.nf"
+        )
+
+    def test_workflow_normalise_call_passes_caller_gatk(self, module_text):
+        """The GATK_GCNV workflow must pass 'GATK' as the caller_name argument
+        when invoking NORMALISE_CNV_QUALITY_SCORES (shared process signature)."""
+        wf_match = re.search(
+            r"workflow GATK_GCNV\s*\{(.+)",
+            module_text,
+            re.DOTALL,
+        )
+        assert wf_match, "GATK_GCNV workflow not found"
+        wf_body = wf_match.group(1)
+        # Find the line(s) containing the NORMALISE_CNV_QUALITY_SCORES call
+        normalise_call = re.search(
+            r"NORMALISE_CNV_QUALITY_SCORES\s*\(.+?'GATK'",
+            wf_body,
+            re.DOTALL,
+        )
+        assert normalise_call, (
+            "NORMALISE_CNV_QUALITY_SCORES call must pass 'GATK' as the caller_name "
+            "argument (second positional arg) to match the shared process signature."
+        )
+
+    def test_workflow_normalise_call_passes_dir_suffix(self, module_text):
+        """The GATK_GCNV workflow must pass 'out_GCNV' as the dir_suffix argument
+        when invoking NORMALISE_CNV_QUALITY_SCORES (shared process signature)."""
+        wf_match = re.search(
+            r"workflow GATK_GCNV\s*\{(.+)",
+            module_text,
+            re.DOTALL,
+        )
+        assert wf_match, "GATK_GCNV workflow not found"
+        wf_body = wf_match.group(1)
+        # Find the line(s) containing the NORMALISE_CNV_QUALITY_SCORES call
+        normalise_call = re.search(
+            r"NORMALISE_CNV_QUALITY_SCORES\s*\(.+?'out_GCNV'",
+            wf_body,
+            re.DOTALL,
+        )
+        assert normalise_call, (
+            "NORMALISE_CNV_QUALITY_SCORES call must pass 'out_GCNV' as the dir_suffix "
+            "argument (third positional arg) to match the shared process signature."
+        )

@@ -59,6 +59,14 @@ def _extract_process(module_text, process_name):
     return match.group(1) if match else None
 
 
+def _uses_shared_process(module_text, process_name='NORMALISE_CNV_QUALITY_SCORES'):
+    """Return True when the module imports process_name from modules-common.nf."""
+    return bool(re.search(
+        rf"include\s*\{{[^}}]*{re.escape(process_name)}[^}}]*\}}.*modules-common\.nf",
+        module_text,
+    ))
+
+
 def _extract_workflow(module_text, workflow_name):
     match = re.search(
         rf"workflow {re.escape(workflow_name)}\s*\{{(.+)",
@@ -268,13 +276,16 @@ class TestCallerFieldCorrectness:
 # ===========================================================================
 
 class TestNormaliseProcessExists:
-    """Each module must contain a NORMALISE_CNV_QUALITY_SCORES process."""
+    """Each module must contain a NORMALISE_CNV_QUALITY_SCORES process, either
+    defined locally or imported from modules-common.nf."""
 
     def _check_process(self, module_text, caller_name):
         body = _extract_process(module_text, 'NORMALISE_CNV_QUALITY_SCORES')
-        assert body is not None, (
-            f"NORMALISE_CNV_QUALITY_SCORES process not found in {caller_name} module"
-        )
+        if body is None:
+            assert _uses_shared_process(module_text), (
+                f"NORMALISE_CNV_QUALITY_SCORES process not found in {caller_name} module "
+                "and not included from modules-common.nf"
+            )
         return body
 
     def test_canoes_has_process(self, canoes_text):
@@ -300,16 +311,31 @@ class TestNormaliseProcessExists:
 
 
 class TestNormaliseProcessCaller:
-    """NORMALISE_CNV_QUALITY_SCORES process must pass the correct --caller value."""
+    """NORMALISE_CNV_QUALITY_SCORES must pass the correct --caller value.
+
+    Modules that define the process locally (e.g. DRAGEN) hardcode --caller in
+    the script block.  Modules that import the shared process from
+    modules-common.nf pass the caller name as a workflow argument instead.
+    """
 
     def _check_caller(self, module_text, expected_caller):
         body = _extract_process(module_text, 'NORMALISE_CNV_QUALITY_SCORES')
-        assert body is not None, (
-            f"NORMALISE_CNV_QUALITY_SCORES process not found in module"
-        )
-        assert f'--caller {expected_caller}' in body, (
-            f"NORMALISE_CNV_QUALITY_SCORES must pass --caller {expected_caller}"
-        )
+        if body is not None:
+            # Local process: the caller must be hardcoded in the script block
+            assert f'--caller {expected_caller}' in body, (
+                f"NORMALISE_CNV_QUALITY_SCORES must pass --caller {expected_caller}"
+            )
+        else:
+            # Shared process from modules-common.nf: caller is passed as a
+            # workflow argument — verify the call site passes the expected value
+            assert _uses_shared_process(module_text), (
+                f"NORMALISE_CNV_QUALITY_SCORES process not found in module and "
+                "not included from modules-common.nf"
+            )
+            assert f"'{expected_caller}'" in module_text, (
+                f"Workflow call to NORMALISE_CNV_QUALITY_SCORES must pass "
+                f"'{expected_caller}' as the caller_name argument"
+            )
 
     def test_canoes_caller(self, canoes_text):
         self._check_caller(canoes_text, 'CANOES')
@@ -334,11 +360,29 @@ class TestNormaliseProcessCaller:
 
 
 class TestNormaliseProcessOutputs:
-    """NORMALISE_CNV_QUALITY_SCORES must emit normalised_vcf and normalised_vcf_index."""
+    """NORMALISE_CNV_QUALITY_SCORES must emit normalised_vcf and normalised_vcf_index.
 
-    def _check_outputs(self, module_text, caller_name):
+    For modules that define the process locally the outputs are checked in the
+    process body.  For modules that import the shared process from
+    modules-common.nf, the outputs are checked in that shared file.
+    """
+
+    @pytest.fixture(scope='class')
+    def common_text(self):
+        return _read_file('modules/modules-common.nf')
+
+    def _check_outputs(self, module_text, caller_name, common_text):
         body = _extract_process(module_text, 'NORMALISE_CNV_QUALITY_SCORES')
-        assert body is not None, f"NORMALISE_CNV_QUALITY_SCORES not found for {caller_name}"
+        if body is None:
+            # Shared process from modules-common.nf — validate outputs there
+            assert _uses_shared_process(module_text), (
+                f"NORMALISE_CNV_QUALITY_SCORES not found for {caller_name} and "
+                "not included from modules-common.nf"
+            )
+            body = _extract_process(common_text, 'NORMALISE_CNV_QUALITY_SCORES')
+            assert body is not None, (
+                "NORMALISE_CNV_QUALITY_SCORES not found in modules-common.nf"
+            )
         assert 'normalised_vcf' in body, (
             f"{caller_name}: process must emit normalised_vcf"
         )
@@ -349,26 +393,26 @@ class TestNormaliseProcessOutputs:
             f"{caller_name}: output files must use .normalised.vcf.gz suffix"
         )
 
-    def test_canoes_outputs(self, canoes_text):
-        self._check_outputs(canoes_text, 'CANOES')
+    def test_canoes_outputs(self, canoes_text, common_text):
+        self._check_outputs(canoes_text, 'CANOES', common_text)
 
-    def test_clamms_outputs(self, clamms_text):
-        self._check_outputs(clamms_text, 'CLAMMS')
+    def test_clamms_outputs(self, clamms_text, common_text):
+        self._check_outputs(clamms_text, 'CLAMMS', common_text)
 
-    def test_xhmm_outputs(self, xhmm_text):
-        self._check_outputs(xhmm_text, 'XHMM')
+    def test_xhmm_outputs(self, xhmm_text, common_text):
+        self._check_outputs(xhmm_text, 'XHMM', common_text)
 
-    def test_indelible_outputs(self, indelible_text):
-        self._check_outputs(indelible_text, 'INDELIBLE')
+    def test_indelible_outputs(self, indelible_text, common_text):
+        self._check_outputs(indelible_text, 'INDELIBLE', common_text)
 
-    def test_gatk_outputs(self, gatk_text):
-        self._check_outputs(gatk_text, 'GATK')
+    def test_gatk_outputs(self, gatk_text, common_text):
+        self._check_outputs(gatk_text, 'GATK', common_text)
 
-    def test_cnvkit_outputs(self, cnvkit_text):
-        self._check_outputs(cnvkit_text, 'CNVKIT')
+    def test_cnvkit_outputs(self, cnvkit_text, common_text):
+        self._check_outputs(cnvkit_text, 'CNVKIT', common_text)
 
-    def test_dragen_outputs(self, dragen_text):
-        self._check_outputs(dragen_text, 'DRAGEN')
+    def test_dragen_outputs(self, dragen_text, common_text):
+        self._check_outputs(dragen_text, 'DRAGEN', common_text)
 
 
 # ===========================================================================

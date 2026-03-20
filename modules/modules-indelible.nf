@@ -1,6 +1,8 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
+include { NORMALISE_CNV_QUALITY_SCORES } from './modules-common.nf'
+
 // =============================================================================
 // INDELIBLE MODULE
 // =============================================================================
@@ -226,32 +228,6 @@ process BGZIP_SORT_INDEX_VCF {
     """
 }
 
-// Process to normalise CNV quality scores to a common scale
-process NORMALISE_CNV_QUALITY_SCORES {
-    tag "${vcf.simpleName}"
-    label 'pysam'
-    publishDir "${outdir}/out_INDELIBLE/vcfs", mode: 'copy', overwrite: true
-
-    input:
-    path vcf
-
-    output:
-    path("*.normalised.vcf.gz"),     emit: normalised_vcf
-    path("*.normalised.vcf.gz.tbi"), emit: normalised_vcf_index
-
-    script:
-    def sample_name = vcf.name - '.sorted.vcf.gz'
-    def normalised_gz = "${sample_name}.normalised.vcf.gz"
-    """
-    normalise_cnv_caller_quality_scores.py \\
-        --input_vcf ${vcf} \\
-        --output_vcf ${sample_name}.normalised.vcf \\
-        --caller INDELIBLE
-    bgzip -c ${sample_name}.normalised.vcf > ${normalised_gz}
-    tabix -p vcf ${normalised_gz}
-    """
-}
-
 // =====================================================================================
 // SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
 // =====================================================================================
@@ -303,7 +279,7 @@ workflow INDELIBLE {
     BGZIP_SORT_INDEX_VCF(CONVERT_INDELIBLE_TO_VCF.out.vcfs)
 
     // Step 12: Normalise quality scores to a common scale
-    NORMALISE_CNV_QUALITY_SCORES(BGZIP_SORT_INDEX_VCF.out.sorted_vcf.flatten())
+    NORMALISE_CNV_QUALITY_SCORES(BGZIP_SORT_INDEX_VCF.out.sorted_vcf.flatten(), 'INDELIBLE', 'out_INDELIBLE')
 
     emit:
     filtered_cnvs        = FILTER_INDELIBLE.out.filtered_cnvs

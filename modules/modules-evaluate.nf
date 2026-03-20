@@ -17,9 +17,7 @@ nextflow.enable.dsl=2
 //    CHR  START  STOP  CNV_TYPE  SAMPLE_ID
 // ================================================================================
 
-params.outdir = './output'
 outdir = file(params.outdir, type: 'dir')
-outdir.mkdir()
 
 // ---------------------------------------------------------------------------------
 // Process 1: Convert a single per-sample VCF to a 5-column BED file

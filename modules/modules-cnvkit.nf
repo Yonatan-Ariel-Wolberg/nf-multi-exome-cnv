@@ -1,11 +1,12 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
+include { BGZIP_SORT_INDEX_VCF; NORMALISE_CNV_QUALITY_SCORES } from './modules-common.nf'
+
 // =====================================================================================
 // GLOBAL PARAMETERS
 // =====================================================================================
 params {
-    outdir = './output' // Change to your desired output path
     test_size = -1 // Specify the test size for performance tuning
 }
 
@@ -147,81 +148,6 @@ process EXPORT_RESULTS {
     """
 }
 
-// Process to compress, sort, index, and annotate each CNVkit VCF with TOOL=CNVkit
-process BGZIP_SORT_INDEX_VCF {
-    tag "${vcf_file.simpleName}"
-    label 'bcftools'
-    publishDir "${outdir}/out_CNVKIT/vcfs", mode: 'copy', overwrite: true
-
-    input:
-    path vcf_file
-
-    output:
-    path("*.sorted.vcf.gz"),     emit: sorted_vcf
-    path("*.sorted.vcf.gz.tbi"), emit: sorted_vcf_index
-
-    script:
-    def sample_name = vcf_file.simpleName
-    def sorted_gz   = "${sample_name}.sorted.vcf.gz"
-    """
-    # Create extra header line for the TOOL INFO field
-    printf '##INFO=<ID=TOOL,Number=1,Type=String,Description="Calling tool">\\n' > extra_header.txt
-
-    # Build a BED annotation file with TOOL=CNVkit for every variant
-    bcftools query -f '%CHROM\\t%POS0\\t%END\\n' ${vcf_file} | \\
-        awk 'BEGIN{OFS="\\t"} {print \$1, \$2, \$3, "CNVkit"}' | \\
-        bgzip -c > ${sample_name}_tool_annot.bed.gz
-    tabix -p bed ${sample_name}_tool_annot.bed.gz
-
-    # Annotate the VCF with TOOL=CNVkit in the INFO field
-    bcftools annotate \\
-        -a ${sample_name}_tool_annot.bed.gz \\
-        -c CHROM,FROM,TO,INFO/TOOL \\
-        -h extra_header.txt \\
-        ${vcf_file} \\
-        -O v -o ${sample_name}_annotated.vcf
-
-    # Compress the annotated VCF with bgzip
-    bgzip -c ${sample_name}_annotated.vcf > ${sample_name}_annotated.vcf.gz
-
-    # Sort the compressed VCF
-    bcftools sort ${sample_name}_annotated.vcf.gz -o ${sorted_gz} -O z
-
-    # Index the sorted VCF
-    tabix -p vcf ${sorted_gz}
-
-    # Remove intermediate files
-    rm -f ${sample_name}_tool_annot.bed.gz ${sample_name}_tool_annot.bed.gz.tbi \\
-          ${sample_name}_annotated.vcf ${sample_name}_annotated.vcf.gz
-    """
-}
-
-// Process to normalise CNV quality scores to a common scale
-process NORMALISE_CNV_QUALITY_SCORES {
-    tag "${vcf.simpleName}"
-    label 'pysam'
-    publishDir "${outdir}/out_CNVKIT/vcfs", mode: 'copy', overwrite: true
-
-    input:
-    path vcf
-
-    output:
-    path("*.normalised.vcf.gz"),     emit: normalised_vcf
-    path("*.normalised.vcf.gz.tbi"), emit: normalised_vcf_index
-
-    script:
-    def sample_name = vcf.name - '.sorted.vcf.gz'
-    def normalised_gz = "${sample_name}.normalised.vcf.gz"
-    """
-    normalise_cnv_caller_quality_scores.py \\
-        --input_vcf ${vcf} \\
-        --output_vcf ${sample_name}.normalised.vcf \\
-        --caller CNVKIT
-    bgzip -c ${sample_name}.normalised.vcf > ${normalised_gz}
-    tabix -p vcf ${normalised_gz}
-    """
-}
-
 // =====================================================================================
 // SUB-WORKFLOW TO CHAIN THE PROCESSES TOGETHER
 // =====================================================================================
@@ -262,10 +188,10 @@ workflow CNVKIT {
     EXPORT_RESULTS(CALL_CNV.out.results)
 
     // Step 7: Compress, sort, index, and annotate each VCF with TOOL=CNVkit
-    BGZIP_SORT_INDEX_VCF(EXPORT_RESULTS.out.vcf)
+    BGZIP_SORT_INDEX_VCF(EXPORT_RESULTS.out.vcf, 'CNVkit', 'out_CNVKIT')
 
     // Step 8: Normalise quality scores to a common scale
-    NORMALISE_CNV_QUALITY_SCORES(BGZIP_SORT_INDEX_VCF.out.sorted_vcf.flatten())
+    NORMALISE_CNV_QUALITY_SCORES(BGZIP_SORT_INDEX_VCF.out.sorted_vcf.flatten(), 'CNVKIT', 'out_CNVKIT')
 
     emit:
     sorted_vcf           = BGZIP_SORT_INDEX_VCF.out.sorted_vcf

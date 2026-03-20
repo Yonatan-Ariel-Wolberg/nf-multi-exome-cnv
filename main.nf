@@ -21,9 +21,6 @@ include { EVALUATE } from './modules/modules-evaluate.nf'
 // =====================================================================================
 // GLOBAL SETUP
 // =====================================================================================
-params.outdir = './output' // Change this to your desired output path
-outdir = file(params.outdir, type: 'dir')
-outdir.mkdir()
 workflow_mode = params.workflow
 
 // =====================================================================================

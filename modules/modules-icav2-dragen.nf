@@ -621,7 +621,7 @@ process ADD_DRAGEN_TOOL_ANNOTATION {
     found=0
     while IFS= read -r vcf; do
         found=1
-        sample_name=\$(basename "\$vcf" | sed 's/\\.vcf\\.gz\$//' | sed 's/\\.vcf\$//')
+        sample_name=\$(basename "\$vcf" | sed 's/\\.cnv\\.vcf\\.gz\$//' | sed 's/\\.vcf\\.gz\$//' | sed 's/\\.vcf\$//')
 
         bcftools query -f '%CHROM\\t%POS0\\t%END\\n' "\$vcf" | \\
             awk 'BEGIN{OFS="\\t"} {print \$1, \$2, \$3, "DRAGEN"}' | \\

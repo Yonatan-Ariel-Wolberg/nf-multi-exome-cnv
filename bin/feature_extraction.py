@@ -262,7 +262,7 @@ _CALLER_FILENAME_PATTERNS = [
     ('xhmm',      re.compile(r'XHMM',      re.IGNORECASE)),
     ('gatk_gcnv', re.compile(r'GCN[V]|GCNV|GATK', re.IGNORECASE)),
     ('cnvkit',    re.compile(r'CNVKit|CNVKIT', re.IGNORECASE)),
-    ('dragen',    re.compile(r'DRAGEN',    re.IGNORECASE)),
+    ('dragen',    re.compile(r'DRAGEN|\.cnv\.vcf', re.IGNORECASE)),
     ('indelible', re.compile(r'INDELIBLE', re.IGNORECASE)),
 ]
 

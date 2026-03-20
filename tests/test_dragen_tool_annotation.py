@@ -240,3 +240,31 @@ class TestRunDragenEvaluateInput:
             "RUN_DRAGEN must NOT use DRAGEN.out.annotated_vcfs for EVALUATE; "
             "use DRAGEN.out.sorted_vcf (sorted and tabix-indexed) instead"
         )
+
+
+# ---------------------------------------------------------------------------
+# 6. ADD_DRAGEN_TOOL_ANNOTATION strips .cnv.vcf.gz (DRAGEN Germline Enrichment)
+# ---------------------------------------------------------------------------
+
+class TestDragenAnnotationCnvVcfGzNaming:
+    """ADD_DRAGEN_TOOL_ANNOTATION must handle ${sample_id}.cnv.vcf.gz inputs.
+
+    DRAGEN Germline Enrichment produces CNV VCF files named
+    ${sample_id}.cnv.vcf.gz.  The sample_name derivation in the process must
+    strip '.cnv.vcf.gz' (and '.cnv.vcf') before constructing the output
+    filename so that the annotated VCF is named correctly.
+    """
+
+    def test_strips_cnv_vcf_gz_in_sample_name(self, dragen_text):
+        process_body = _extract_process(dragen_text, 'ADD_DRAGEN_TOOL_ANNOTATION')
+        assert process_body is not None, \
+            "ADD_DRAGEN_TOOL_ANNOTATION process not found in modules-icav2-dragen.nf"
+        # In Nextflow script blocks backslashes are doubled; match either form.
+        has_cnv = (
+            r'\\.cnv\\.vcf\\.gz' in process_body   # escaped form inside script block
+            or '.cnv.vcf.gz' in process_body        # unescaped form
+        )
+        assert has_cnv, (
+            "ADD_DRAGEN_TOOL_ANNOTATION must strip .cnv.vcf.gz when deriving "
+            "sample_name to support DRAGEN Germline Enrichment output naming"
+        )

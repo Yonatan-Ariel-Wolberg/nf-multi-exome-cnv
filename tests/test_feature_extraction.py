@@ -838,6 +838,33 @@ class TestCallerOrderFromSurvivorHeader:
                 f"_caller_order_from_survivor_header must recognise {caller} filenames"
             )
 
+    def test_dragen_pattern_matches_cnv_vcf_gz(self, fe):
+        """DRAGEN caller pattern must match ${sample_id}.cnv.vcf.gz filenames.
+
+        DRAGEN Germline Enrichment names its CNV VCF outputs as
+        ${sample_id}.cnv.vcf.gz.  The pattern for 'dragen' in
+        _CALLER_FILENAME_PATTERNS must recognise this naming convention.
+        """
+        import re as _re
+        dragen_pattern = None
+        for name, pat in fe._CALLER_FILENAME_PATTERNS:
+            if name == 'dragen':
+                dragen_pattern = pat
+                break
+        assert dragen_pattern is not None, \
+            "'dragen' entry not found in _CALLER_FILENAME_PATTERNS"
+        assert dragen_pattern.search('NA12878.cnv.vcf.gz'), (
+            "DRAGEN pattern must match 'NA12878.cnv.vcf.gz' "
+            "(DRAGEN Germline Enrichment output naming)"
+        )
+        assert dragen_pattern.search('SAMPLE.cnv.vcf'), (
+            "DRAGEN pattern must match 'SAMPLE.cnv.vcf'"
+        )
+        # Must still match the existing DRAGEN keyword in filenames
+        assert dragen_pattern.search('PT01_DRAGEN_output.vcf.gz'), (
+            "DRAGEN pattern must still match filenames containing 'DRAGEN'"
+        )
+
     def test_parses_sample_id_and_file(self, script_text):
         """Parser must extract ID= and File= from ##SAMPLE meta-info lines."""
         assert 'ID=' in script_text and 'File=' in script_text

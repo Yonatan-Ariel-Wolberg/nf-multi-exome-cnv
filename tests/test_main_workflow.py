@@ -279,23 +279,38 @@ class TestGatherVcfsFunction:
         ("SAMP",      "SAMP_CNVKIT_output.vcf"),
         ("PT01",      "PT01_DRAGEN_output.vcf"),
         ("PT02",      "PT02_INDELIBLE_output.vcf"),
+        # DRAGEN Germline Enrichment output naming: ${sample_id}.cnv.vcf.gz
+        ("NA12878",   "NA12878.cnv.vcf.gz"),
+        ("SAMPLE003", "SAMPLE003.cnv.vcf.gz"),
+        ("SAMPLE004", "SAMPLE004.cnv.vcf"),
     ])
     def test_get_id_regex_extracts_sample_id(self, main_text, sample_id, filename):
         """The get_id regex in gather_vcfs() must correctly strip caller suffixes.
 
         Simulates the Groovy closure:
-          f.name.replaceAll(/_((CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*/, '')
+          f.name.replaceAll(/_(CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*/, '')
+                .replaceAll(/\\.cnv\\.vcf(\\.gz)?$/i, '')
                 .replaceAll(/\\.vcf(\\.gz)?$/i, '')
+
+        Also handles DRAGEN Germline Enrichment outputs named ${sample_id}.cnv.vcf.gz.
         """
         import re as _re
         # Replicate the Groovy regex logic in Python
         extracted = _re.sub(
             r'_(CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*', '', filename
         )
+        extracted = _re.sub(r'\.cnv\.vcf(\.gz)?$', '', extracted, flags=_re.IGNORECASE)
         extracted = _re.sub(r'\.vcf(\.gz)?$', '', extracted, flags=_re.IGNORECASE)
         assert extracted == sample_id, (
             f"get_id regex must extract '{sample_id}' from '{filename}', "
             f"got '{extracted}'"
+        )
+
+    def test_get_id_cnv_vcf_gz_regex_in_main_nf(self, main_text):
+        """gather_vcfs() get_id closure must strip .cnv.vcf.gz suffixes for DRAGEN."""
+        assert r'\.cnv\.vcf' in main_text or '.cnv.vcf' in main_text, (
+            "get_id in gather_vcfs() must handle .cnv.vcf.gz filenames "
+            "produced by DRAGEN Germline Enrichment"
         )
 
 

@@ -131,7 +131,7 @@ workflow RUN_DRAGEN {
         DRAGEN(cramPairs)
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
-                DRAGEN.out.annotated_vcfs.flatten(),
+                DRAGEN.out.sorted_vcf.flatten(),
                 file(params.truth_bed),
                 file(params.probes_bed),
                 'DRAGEN'

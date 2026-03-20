@@ -597,7 +597,7 @@ process DELETE_DATA {
 
 process ADD_DRAGEN_TOOL_ANNOTATION {
     debug true
-    tag "Add TOOLS=DRAGEN annotation"
+    tag "Add TOOL=DRAGEN annotation"
     label 'bcftools'
     publishDir "${params.localDownloadPath}", mode: 'copy', overwrite: true
     cpus 1
@@ -614,9 +614,9 @@ process ADD_DRAGEN_TOOL_ANNOTATION {
     #!/bin/bash
     set -euo pipefail
 
-    echo "Annotating downloaded DRAGEN VCF files with TOOLS=DRAGEN in INFO field..."
+    echo "Annotating downloaded DRAGEN VCF files with TOOL=DRAGEN in INFO field..."
 
-    printf '##INFO=<ID=TOOLS,Number=1,Type=String,Description="Source caller tool">\\n' > extra_header.txt
+    printf '##INFO=<ID=TOOL,Number=1,Type=String,Description="Calling tool">\\n' > extra_header.txt
 
     found=0
     while IFS= read -r vcf; do
@@ -625,24 +625,46 @@ process ADD_DRAGEN_TOOL_ANNOTATION {
 
         bcftools query -f '%CHROM\\t%POS0\\t%END\\n' "\$vcf" | \\
             awk 'BEGIN{OFS="\\t"} {print \$1, \$2, \$3, "DRAGEN"}' | \\
-            bgzip -c > "\${sample_name}_tools_annot.bed.gz"
-        tabix -p bed "\${sample_name}_tools_annot.bed.gz"
+            bgzip -c > "\${sample_name}_tool_annot.bed.gz"
+        tabix -p bed "\${sample_name}_tool_annot.bed.gz"
 
         bcftools annotate \\
-            -a "\${sample_name}_tools_annot.bed.gz" \\
-            -c CHROM,FROM,TO,INFO/TOOLS \\
+            -a "\${sample_name}_tool_annot.bed.gz" \\
+            -c CHROM,FROM,TO,INFO/TOOL \\
             -h extra_header.txt \\
             "\$vcf" \\
             -O z -o "\${sample_name}_DRAGEN_output.annotated.vcf.gz"
 
-        rm -f "\${sample_name}_tools_annot.bed.gz" "\${sample_name}_tools_annot.bed.gz.tbi"
+        rm -f "\${sample_name}_tool_annot.bed.gz" "\${sample_name}_tool_annot.bed.gz.tbi"
     done < <(find ${downloadPath} -type f \\( -name "*.vcf.gz" -o -name "*.vcf" \\) 2>/dev/null || true)
 
     if [ \$found -eq 0 ]; then
         echo "No VCF files found in ${downloadPath}. Skipping annotation."
     else
-        echo "TOOLS=DRAGEN annotation complete."
+        echo "TOOL=DRAGEN annotation complete."
     fi
+    """
+}
+
+// Process to compress, sort, and index each annotated DRAGEN VCF
+process BGZIP_SORT_INDEX_VCF {
+    tag "${vcf_file.simpleName}"
+    label 'bcftools'
+    publishDir "${params.localDownloadPath}", mode: 'copy', overwrite: true
+
+    input:
+    path vcf_file
+
+    output:
+    path("*.sorted.vcf.gz"),     emit: sorted_vcf
+    path("*.sorted.vcf.gz.tbi"), emit: sorted_vcf_index
+
+    script:
+    def sample_name = vcf_file.name - '.annotated.vcf.gz'
+    def sorted_gz   = "${sample_name}.sorted.vcf.gz"
+    """
+    bcftools sort ${vcf_file} -o ${sorted_gz} -O z
+    tabix -p vcf ${sorted_gz}
     """
 }
 
@@ -660,7 +682,7 @@ process NORMALISE_CNV_QUALITY_SCORES {
     path("*.normalised.vcf.gz.tbi"), emit: normalised_vcf_index
 
     script:
-    def sample_name = vcf.name - '.annotated.vcf.gz'
+    def sample_name = vcf.name - '.sorted.vcf.gz'
     def normalised_gz = "${sample_name}.normalised.vcf.gz"
     """
     normalise_cnv_caller_quality_scores.py \\
@@ -716,15 +738,20 @@ workflow DRAGEN {
     // Step 8: Clean up temporary CRAM files and output folder from ICA
     DELETE_DATA(DOWNLOAD_ANALYSIS_OUTPUT.out.dataFile)
 
-    // Step 9: Annotate downloaded VCF files with TOOLS=DRAGEN in INFO field
+    // Step 9: Annotate downloaded VCF files with TOOL=DRAGEN in INFO field
     ADD_DRAGEN_TOOL_ANNOTATION(DOWNLOAD_ANALYSIS_OUTPUT.out.dataFile)
 
-    // Step 10: Normalise quality scores to a common scale
-    NORMALISE_CNV_QUALITY_SCORES(ADD_DRAGEN_TOOL_ANNOTATION.out.annotated_vcfs.flatten())
+    // Step 10: Sort and index each annotated VCF
+    BGZIP_SORT_INDEX_VCF(ADD_DRAGEN_TOOL_ANNOTATION.out.annotated_vcfs.flatten())
+
+    // Step 11: Normalise quality scores to a common scale
+    NORMALISE_CNV_QUALITY_SCORES(BGZIP_SORT_INDEX_VCF.out.sorted_vcf.flatten())
 
     emit:
     result               = DOWNLOAD_ANALYSIS_OUTPUT.out.dataFile
     annotated_vcfs       = ADD_DRAGEN_TOOL_ANNOTATION.out.annotated_vcfs
+    sorted_vcf           = BGZIP_SORT_INDEX_VCF.out.sorted_vcf
+    sorted_vcf_index     = BGZIP_SORT_INDEX_VCF.out.sorted_vcf_index
     normalised_vcf       = NORMALISE_CNV_QUALITY_SCORES.out.normalised_vcf
     normalised_vcf_index = NORMALISE_CNV_QUALITY_SCORES.out.normalised_vcf_index
 }

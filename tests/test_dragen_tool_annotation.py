@@ -87,6 +87,27 @@ class TestDragenToolAnnotationInfoField:
             "ADD_DRAGEN_TOOL_ANNOTATION must NOT use INFO/TOOLS (plural)"
         )
 
+    def test_annotated_output_uses_dragen_suffix_not_dragen_output(self, dragen_text):
+        """Output filename must use _DRAGEN.annotated.vcf.gz (not _DRAGEN_output).
+
+        The convention for all callers is ${sample_id}_CALLERNAME.normalised.vcf.gz.
+        Using _DRAGEN (not _DRAGEN_output) as the intermediate suffix ensures the
+        final normalised VCF is named ${sample_id}_DRAGEN.normalised.vcf.gz,
+        matching what main.nf build_feature_inputs expects.
+        """
+        process_body = _extract_process(dragen_text, 'ADD_DRAGEN_TOOL_ANNOTATION')
+        assert process_body is not None, \
+            "ADD_DRAGEN_TOOL_ANNOTATION process not found"
+        assert '_DRAGEN.annotated.vcf.gz' in process_body, (
+            "ADD_DRAGEN_TOOL_ANNOTATION output must use *_DRAGEN.annotated.vcf.gz "
+            "so the downstream chain produces ${sample_id}_DRAGEN.normalised.vcf.gz"
+        )
+        assert '_DRAGEN_output.annotated.vcf.gz' not in process_body, (
+            "ADD_DRAGEN_TOOL_ANNOTATION must NOT use *_DRAGEN_output.annotated.vcf.gz; "
+            "this would produce _DRAGEN_output.normalised.vcf.gz instead of "
+            "_DRAGEN.normalised.vcf.gz which main.nf build_feature_inputs expects"
+        )
+
 
 # ---------------------------------------------------------------------------
 # 2. BGZIP_SORT_INDEX_VCF process exists in DRAGEN module
@@ -267,4 +288,41 @@ class TestDragenAnnotationCnvVcfGzNaming:
         assert has_cnv, (
             "ADD_DRAGEN_TOOL_ANNOTATION must strip .cnv.vcf.gz when deriving "
             "sample_name to support DRAGEN Germline Enrichment output naming"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 7. Full naming-convention chain: _DRAGEN.normalised.vcf.gz
+# ---------------------------------------------------------------------------
+
+class TestDragenNormalisedNamingConvention:
+    """DRAGEN normalised VCF must follow the ${sample_id}_DRAGEN.normalised.vcf.gz convention.
+
+    main.nf build_feature_inputs references normalised DRAGEN VCFs as
+    '${sample_id}_DRAGEN.normalised.vcf.gz'.  The three-step chain in the
+    DRAGEN module must produce exactly this name:
+
+      ADD_DRAGEN_TOOL_ANNOTATION  →  ${sample_id}_DRAGEN.annotated.vcf.gz
+      BGZIP_SORT_INDEX_VCF        →  ${sample_id}_DRAGEN.sorted.vcf.gz
+      NORMALISE_CNV_QUALITY_SCORES→  ${sample_id}_DRAGEN.normalised.vcf.gz
+    """
+
+    def test_bgzip_strips_annotated_suffix_to_derive_sample_name(self, dragen_text):
+        """BGZIP_SORT_INDEX_VCF must strip .annotated.vcf.gz (not .sorted.vcf.gz)."""
+        process_body = _extract_process(dragen_text, 'BGZIP_SORT_INDEX_VCF')
+        assert process_body is not None, "BGZIP_SORT_INDEX_VCF not found"
+        assert "'.annotated.vcf.gz'" in process_body or '".annotated.vcf.gz"' in process_body, (
+            "BGZIP_SORT_INDEX_VCF must strip .annotated.vcf.gz to derive sample_name, "
+            "so that the sorted VCF is named ${sample_id}_DRAGEN.sorted.vcf.gz"
+        )
+
+    def test_main_nf_expects_dragen_normalised_vcf(self, main_text):
+        """main.nf build_feature_inputs must reference ${sample_id}_DRAGEN.normalised.vcf.gz."""
+        assert '_DRAGEN.normalised.vcf.gz' in main_text, (
+            "main.nf build_feature_inputs must reference the DRAGEN normalised VCF as "
+            "'${sample_id}_DRAGEN.normalised.vcf.gz'"
+        )
+        assert '_DRAGEN_output.normalised.vcf.gz' not in main_text, (
+            "main.nf must NOT reference '_DRAGEN_output.normalised.vcf.gz'; "
+            "the convention is '${sample_id}_DRAGEN.normalised.vcf.gz'"
         )

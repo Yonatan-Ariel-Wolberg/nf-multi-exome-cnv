@@ -606,7 +606,7 @@ process ADD_DRAGEN_TOOL_ANNOTATION {
     path(dataFile)
 
     output:
-    path "*_DRAGEN_output.annotated.vcf.gz", emit: annotated_vcfs, optional: true
+    path "*_DRAGEN.annotated.vcf.gz", emit: annotated_vcfs, optional: true
 
     script:
     def downloadPath = params.localDownloadPath
@@ -633,7 +633,7 @@ process ADD_DRAGEN_TOOL_ANNOTATION {
             -c CHROM,FROM,TO,INFO/TOOL \\
             -h extra_header.txt \\
             "\$vcf" \\
-            -O z -o "\${sample_name}_DRAGEN_output.annotated.vcf.gz"
+            -O z -o "\${sample_name}_DRAGEN.annotated.vcf.gz"
 
         rm -f "\${sample_name}_tool_annot.bed.gz" "\${sample_name}_tool_annot.bed.gz.tbi"
     done < <(find ${downloadPath} -type f \\( -name "*.vcf.gz" -o -name "*.vcf" \\) 2>/dev/null || true)

@@ -323,7 +323,7 @@ workflow {
             chroms = (1..22).toList().collect { 'chr' + "${it}" }
             Channel.fromPath(params.samplesheet_bams)
                 .splitCsv(header: true, sep: '\t')
-                .map { row -> [ "${row.SampleID}", "${row.BAM}", "${row.BAM}".replaceAll("\\b.bam\\b",".bam.bai") ] }
+                .map { row -> [ "${row.SampleID}", "${row.BAM}", "${row.BAM}".replaceAll(/\.bam$/, '.bam.bai') ] }
                 .set { ch_bams }
             RUN_CANOES(ch_bams, chroms, file(params.fai))
             break
@@ -331,7 +331,7 @@ workflow {
         case['xhmm']:
             Channel.fromPath(params.samplesheet_bams)
                 .splitCsv(header: true, sep: '\t')
-                .map { row -> [ "${row.SampleID}", "${row.BAM}", "${row.BAM}".replaceAll("\\b.bam\\b",".bam.bai") ] }
+                .map { row -> [ "${row.SampleID}", "${row.BAM}", "${row.BAM}".replaceAll(/\.bam$/, '.bam.bai') ] }
                 .set { ch_bams }
             RUN_XHMM(ch_bams)
             break
@@ -339,7 +339,7 @@ workflow {
         case['clamms']:
             Channel.fromPath(params.samplesheet_bams)
                 .splitCsv(header: true, sep: '\t')
-                .map { row -> [ "${row.SampleID}", "${row.BAM}", "${row.BAM}".replaceAll("\\b.bam\\b",".bam.bai") ] }
+                .map { row -> [ "${row.SampleID}", "${row.BAM}", "${row.BAM}".replaceAll(/\.bam$/, '.bam.bai') ] }
                 .set { ch_bams }
             RUN_CLAMMS(ch_bams, file(params.fai))
             break
@@ -355,7 +355,7 @@ workflow {
             break
 
         case['cnvkit']:
-            Channel.fromPath(params.bams.replace(".bam", ".{bam,bai}"))
+            Channel.fromPath(params.bams.replaceAll(/\.bam$/, '.{bam,bai}'))
                 .map { it -> [it.baseName, it] }.groupTuple(size: 2)
                 .map { id, files -> [id, files.find { it.extension == 'bam' }, files.find { it.extension == 'bai' }] }
                 .filter { id, bam, bai -> 

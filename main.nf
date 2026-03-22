@@ -23,6 +23,16 @@ include { EVALUATE } from './modules/modules-evaluate.nf'
 // =====================================================================================
 workflow_mode = params.workflow
 
+def CALLER_DIR_PARAMS = [
+    'canoes_dir',
+    'clamms_dir',
+    'xhmm_dir',
+    'cnvkit_dir',
+    'gcnv_dir',
+    'dragen_dir',
+    'indelible_dir',
+]
+
 // =====================================================================================
 // HELPER FUNCTION: GATHER VCFS FOR CONSENSUS MODULES
 // =====================================================================================
@@ -34,19 +44,24 @@ def gather_vcfs() {
     // Also handles DRAGEN Germline Enrichment outputs named ${sample_id}.cnv.vcf.gz.
     def get_id = { f -> f.name.replaceAll(/_(CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*/, '').replaceAll(/\.cnv\.vcf(\.gz)?$/i, '').replaceAll(/\.vcf(\.gz)?$/i, '') }
 
-    if (params.get('canoes_dir', false))    { ch = ch.mix(Channel.fromPath(params.canoes_dir + "/*.vcf*").map { f -> [get_id(f), f] }); dir_count++ }
-    if (params.get('clamms_dir', false))    { ch = ch.mix(Channel.fromPath(params.clamms_dir + "/*.vcf*").map { f -> [get_id(f), f] }); dir_count++ }
-    if (params.get('xhmm_dir', false))      { ch = ch.mix(Channel.fromPath(params.xhmm_dir + "/*.vcf*").map   { f -> [get_id(f), f] }); dir_count++ }
-    if (params.get('cnvkit_dir', false))    { ch = ch.mix(Channel.fromPath(params.cnvkit_dir + "/*.vcf*").map { f -> [get_id(f), f] }); dir_count++ }
-    if (params.get('gcnv_dir', false))      { ch = ch.mix(Channel.fromPath(params.gcnv_dir + "/*.vcf*").map   { f -> [get_id(f), f] }); dir_count++ }
-    if (params.get('dragen_dir', false))    { ch = ch.mix(Channel.fromPath(params.dragen_dir + "/*.vcf*").map { f -> [get_id(f), f] }); dir_count++ }
-    if (params.get('indelible_dir', false)) { ch = ch.mix(Channel.fromPath(params.indelible_dir + "/*.vcf*").map { f -> [get_id(f), f] }); dir_count++ }
+    CALLER_DIR_PARAMS.each { caller_dir ->
+        if (params.get(caller_dir, false)) {
+            ch = ch.mix(Channel.fromPath(params[caller_dir] + "/*.vcf*").map { f -> [get_id(f), f] })
+            dir_count++
+        }
+    }
     
     if (dir_count < 2) {
         exit 1, "Error: You must provide VCF directories for at least TWO different callers (e.g., --canoes_dir and --clamms_dir) to run consensus modules."
     }
     
     return ch
+}
+
+def group_caller_vcfs(vcf_ch) {
+    return vcf_ch
+        .groupTuple()
+        .filter { sample_id, vcfs -> vcfs.size() >= 2 }
 }
 
 // =====================================================================================
@@ -188,11 +203,7 @@ workflow RUN_SURVIVOR {
     take: 
         vcf_ch
     main:
-        // Group by sample_id, then enforce that a sample MUST have VCFs from >= 2 different callers to proceed
-        grouped_vcfs = vcf_ch
-            .groupTuple()
-            .filter { sample_id, vcfs -> vcfs.size() >= 2 }
-            
+        grouped_vcfs = group_caller_vcfs(vcf_ch)
         SURVIVOR(grouped_vcfs)
 }
 
@@ -200,11 +211,7 @@ workflow RUN_TRUVARI {
     take: 
         vcf_ch
     main:
-        // Group by sample_id, then enforce that a sample MUST have VCFs from >= 2 different callers to proceed
-        grouped_vcfs = vcf_ch
-            .groupTuple()
-            .filter { sample_id, vcfs -> vcfs.size() >= 2 }
-            
+        grouped_vcfs = group_caller_vcfs(vcf_ch)
         TRUVARI(grouped_vcfs)
 }
 
@@ -266,9 +273,7 @@ workflow RUN_SURVIVOR_WITH_FEATURES {
     take:
         vcf_ch
     main:
-        grouped_vcfs = vcf_ch
-            .groupTuple()
-            .filter { sample_id, vcfs -> vcfs.size() >= 2 }
+        grouped_vcfs = group_caller_vcfs(vcf_ch)
         SURVIVOR(grouped_vcfs)
         feature_inputs_ch = SURVIVOR.out.union_vcf
             .map { sample_id, merged_vcf -> build_feature_inputs(sample_id, merged_vcf, []) }
@@ -279,9 +284,7 @@ workflow RUN_TRUVARI_WITH_FEATURES {
     take:
         vcf_ch
     main:
-        grouped_vcfs = vcf_ch
-            .groupTuple()
-            .filter { sample_id, vcfs -> vcfs.size() >= 2 }
+        grouped_vcfs = group_caller_vcfs(vcf_ch)
         TRUVARI(grouped_vcfs)
         feature_inputs_ch = TRUVARI.out.merged_vcf
             .join(TRUVARI.out.collapsed_vcf)

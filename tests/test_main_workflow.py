@@ -321,6 +321,21 @@ class TestGatherVcfsFunction:
 class TestConsensusWorkflowFiltering:
     """RUN_SURVIVOR and RUN_TRUVARI must only process samples with ≥2 caller VCFs."""
 
+    def test_group_caller_vcfs_helper_enforces_min_two_callers(self, main_text):
+        helper = re.search(
+            r"def group_caller_vcfs\(vcf_ch\)\s*\{(.+?)\n\}",
+            main_text,
+            re.DOTALL,
+        )
+        assert helper, "main.nf must define group_caller_vcfs(vcf_ch)"
+        helper_body = helper.group(1)
+        assert ".groupTuple()" in helper_body, (
+            "group_caller_vcfs() must aggregate VCFs by sample_id with .groupTuple()"
+        )
+        assert "vcfs.size() >= 2" in helper_body, (
+            "group_caller_vcfs() must enforce vcfs.size() >= 2"
+        )
+
     def test_run_survivor_filters_single_caller_samples(self, main_text):
         """RUN_SURVIVOR must filter out samples with only 1 caller VCF."""
         run_survivor = re.search(
@@ -330,15 +345,11 @@ class TestConsensusWorkflowFiltering:
         )
         assert run_survivor, "workflow RUN_SURVIVOR not found"
         body = run_survivor.group(1)
-        # Must groupTuple and filter for >= 2 VCFs
-        assert ".groupTuple()" in body, (
-            "RUN_SURVIVOR must use .groupTuple() to aggregate VCFs by sample_id"
-        )
-        assert ".filter" in body, (
-            "RUN_SURVIVOR must use .filter to exclude samples with < 2 caller VCFs"
-        )
-        assert "vcfs.size() >= 2" in body, (
-            "RUN_SURVIVOR filter condition must require vcfs.size() >= 2"
+        assert "group_caller_vcfs(vcf_ch)" in body or (
+            ".groupTuple()" in body and "vcfs.size() >= 2" in body
+        ), (
+            "RUN_SURVIVOR must enforce a minimum of 2 caller VCFs per sample "
+            "via group_caller_vcfs(vcf_ch) or equivalent inline filtering"
         )
 
     def test_run_truvari_filters_single_caller_samples(self, main_text):
@@ -350,14 +361,11 @@ class TestConsensusWorkflowFiltering:
         )
         assert run_truvari, "workflow RUN_TRUVARI not found"
         body = run_truvari.group(1)
-        assert ".groupTuple()" in body, (
-            "RUN_TRUVARI must use .groupTuple() to aggregate VCFs by sample_id"
-        )
-        assert ".filter" in body, (
-            "RUN_TRUVARI must use .filter to exclude samples with < 2 caller VCFs"
-        )
-        assert "vcfs.size() >= 2" in body, (
-            "RUN_TRUVARI filter condition must require vcfs.size() >= 2"
+        assert "group_caller_vcfs(vcf_ch)" in body or (
+            ".groupTuple()" in body and "vcfs.size() >= 2" in body
+        ), (
+            "RUN_TRUVARI must enforce a minimum of 2 caller VCFs per sample "
+            "via group_caller_vcfs(vcf_ch) or equivalent inline filtering"
         )
 
     def test_run_survivor_calls_survivor_workflow(self, main_text):
@@ -561,8 +569,9 @@ class TestCombinedWorkflowWiring:
 
     def test_run_survivor_with_features_filters_min_two_callers(self, main_text):
         body = self._get_workflow_body(main_text, "RUN_SURVIVOR_WITH_FEATURES")
-        assert "vcfs.size() >= 2" in body, (
-            "RUN_SURVIVOR_WITH_FEATURES must filter samples with < 2 caller VCFs"
+        assert "group_caller_vcfs(vcf_ch)" in body or "vcfs.size() >= 2" in body, (
+            "RUN_SURVIVOR_WITH_FEATURES must enforce minimum-2 caller VCFs "
+            "before consensus merging"
         )
 
     def test_run_truvari_with_features_calls_truvari(self, main_text):
@@ -592,8 +601,9 @@ class TestCombinedWorkflowWiring:
 
     def test_run_truvari_with_features_filters_min_two_callers(self, main_text):
         body = self._get_workflow_body(main_text, "RUN_TRUVARI_WITH_FEATURES")
-        assert "vcfs.size() >= 2" in body, (
-            "RUN_TRUVARI_WITH_FEATURES must filter samples with < 2 caller VCFs"
+        assert "group_caller_vcfs(vcf_ch)" in body or "vcfs.size() >= 2" in body, (
+            "RUN_TRUVARI_WITH_FEATURES must enforce minimum-2 caller VCFs "
+            "before consensus merging"
         )
 
     def test_survivor_with_features_case_calls_gather_vcfs(self, main_text):

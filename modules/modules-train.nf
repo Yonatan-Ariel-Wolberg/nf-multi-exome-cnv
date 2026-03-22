@@ -28,6 +28,10 @@ outdir = file(params.outdir, type: 'dir')
 // Outputs:
 //   model  -- trained XGBoost model saved in JSON format (cnv_model.json)
 //   report -- plain-text training summary (training_report.txt)
+//   roc_plot / pr_plot -- ROC and precision-recall curve plots (SVG)
+//   roc_data / pr_data -- ROC and precision-recall points (TSV)
+//   shap_values -- per-call SHAP values (TSV)
+//   shap_summary_plot / shap_beeswarm_plot -- SHAP summary plots (SVG)
 
 process TRAIN_XGBOOST {
     tag "train"
@@ -42,6 +46,13 @@ process TRAIN_XGBOOST {
     output:
     path("cnv_model.json"),      emit: model
     path("training_report.txt"), emit: report
+    path("roc_curve.svg"),       emit: roc_plot
+    path("pr_curve.svg"),        emit: pr_plot
+    path("roc_curve.tsv"),       emit: roc_data
+    path("pr_curve.tsv"),        emit: pr_data
+    path("shap_values.tsv"),     emit: shap_values
+    path("shap_summary_bar.svg"), emit: shap_summary_plot
+    path("shap_summary_beeswarm.svg"), emit: shap_beeswarm_plot
 
     script:
     // All feature TSV files are staged into the working directory by Nextflow.
@@ -54,7 +65,14 @@ process TRAIN_XGBOOST {
         --truth_labels   '${truth_labels}' \
         ${probes_arg} \
         --output_model   cnv_model.json \
-        --output_report  training_report.txt
+        --output_report  training_report.txt \
+        --output_roc_plot roc_curve.svg \
+        --output_pr_plot  pr_curve.svg \
+        --output_roc_data roc_curve.tsv \
+        --output_pr_data  pr_curve.tsv \
+        --output_shap_values shap_values.tsv \
+        --output_shap_summary_plot shap_summary_bar.svg \
+        --output_shap_beeswarm_plot shap_summary_beeswarm.svg
     """
 }
 
@@ -77,6 +95,13 @@ workflow TRAIN {
         TRAIN_XGBOOST(features_tsv_ch.collect(), truth_labels_ch, probes_bed_ch)
 
     emit:
-        model  = TRAIN_XGBOOST.out.model
-        report = TRAIN_XGBOOST.out.report
+        model              = TRAIN_XGBOOST.out.model
+        report             = TRAIN_XGBOOST.out.report
+        roc_plot           = TRAIN_XGBOOST.out.roc_plot
+        pr_plot            = TRAIN_XGBOOST.out.pr_plot
+        roc_data           = TRAIN_XGBOOST.out.roc_data
+        pr_data            = TRAIN_XGBOOST.out.pr_data
+        shap_values        = TRAIN_XGBOOST.out.shap_values
+        shap_summary_plot  = TRAIN_XGBOOST.out.shap_summary_plot
+        shap_beeswarm_plot = TRAIN_XGBOOST.out.shap_beeswarm_plot
 }

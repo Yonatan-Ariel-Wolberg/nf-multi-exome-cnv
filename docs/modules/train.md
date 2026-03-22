@@ -1,7 +1,7 @@
 # Training module (`--workflow train`)
 
 ## Methodology
-This module trains an XGBoost classifier from feature matrices and truth labels, producing a serialized model and training report.
+This module trains an XGBoost classifier from feature matrices and truth labels, producing a serialized model, training report, ROC/PR curves, and SHAP feature-attribution artifacts.
 
 ## Processes in this module
 1. **TRAIN_XGBOOST** – read `*_features.tsv`, join labels, train model, and write outputs.
@@ -34,3 +34,12 @@ capture probes on the same `sample_id`, `chrom`, and `cnv_type`.
 
 ## Params template
 - `params/params-train.json`
+
+## Outputs
+- `cnv_model.json` – trained XGBoost model.
+- `training_report.txt` – summary of sample counts, class balance, match counts, and AUC metrics.
+- `roc_curve.svg` / `roc_curve.tsv` – ROC plot and underlying points.
+- `pr_curve.svg` / `pr_curve.tsv` – precision-recall plot and underlying points.
+- `shap_values.tsv` – per-call SHAP values for numeric model features.
+- `shap_summary_bar.svg` – SHAP mean absolute contribution bar chart.
+- `shap_summary_beeswarm.svg` – SHAP beeswarm plot for top features.

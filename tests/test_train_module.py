@@ -114,6 +114,15 @@ class TestProcessIO:
     def test_output_report(self, nf_text):
         assert 'training_report.txt' in nf_text
 
+    def test_output_roc_plot(self, nf_text):
+        assert 'roc_curve.svg' in nf_text
+
+    def test_output_pr_plot(self, nf_text):
+        assert 'pr_curve.svg' in nf_text
+
+    def test_output_shap_values(self, nf_text):
+        assert 'shap_values.tsv' in nf_text
+
     def test_emit_model(self, nf_text):
         assert 'emit: model' in nf_text
 
@@ -145,6 +154,17 @@ class TestScriptBlock:
 
     def test_passes_output_report(self, nf_text):
         assert '--output_report' in nf_text
+
+    def test_passes_roc_and_pr_outputs(self, nf_text):
+        assert '--output_roc_plot' in nf_text
+        assert '--output_pr_plot' in nf_text
+        assert '--output_roc_data' in nf_text
+        assert '--output_pr_data' in nf_text
+
+    def test_passes_shap_outputs(self, nf_text):
+        assert '--output_shap_values' in nf_text
+        assert '--output_shap_summary_plot' in nf_text
+        assert '--output_shap_beeswarm_plot' in nf_text
 
 
 # ===========================================================================
@@ -183,6 +203,14 @@ class TestWorkflowTrain:
     def test_workflow_emits_report(self, nf_text):
         block = self._train_block(nf_text)
         assert 'report' in block
+
+    def test_workflow_emits_new_artifacts(self, nf_text):
+        block = self._train_block(nf_text)
+        assert 'roc_plot' in block
+        assert 'pr_plot' in block
+        assert 'shap_values' in block
+        assert 'shap_summary_plot' in block
+        assert 'shap_beeswarm_plot' in block
 
     def test_workflow_collects_features(self, nf_text):
         """Feature TSVs must be collected so the process sees all samples."""

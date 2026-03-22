@@ -508,6 +508,7 @@ DDD_AFRICA_INDELIBLE_DIRS = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/
 WITS_REF_FASTA = "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa"
 WITS_REF_FAI = "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
 WITS_TARGETS_BED = "/dataG/ddd/data/resources/canoes/probes_sanger.bed"
+WITS_INDELIBLE_PRIORS = "/dataG/ddd/data/resources/indelible/Indelible_db_10k.hg38.bed"
 WITS_TARGETS_INTERVAL_LIST = "/dataG/ddd/data/resources/canoes/probes_sanger.interval_list"
 DDD_UK_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/samplesheet.tsv"
 DDD_UK_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam,bam.bai}"
@@ -630,6 +631,12 @@ class TestParamsWitsJson:
     def test_wits_params_include_ddd_africa_indelible_dirs(self):
         """INDELIBLE must point to the DDD-AFRICA organized_data family directories."""
         assert self._read_json('params-indelible-wits.json').get('crams') == DDD_AFRICA_INDELIBLE_DIRS
+
+    def test_wits_indelible_params_use_datag_indelible_priors(self):
+        """INDELIBLE Wits templates must use the shared /dataG Indelible priors BED."""
+        assert self._read_json('params-indelible-wits.json').get('priors') == WITS_INDELIBLE_PRIORS
+        assert self._read_json('params-indelible-wits-ddd-africa.json').get('priors') == WITS_INDELIBLE_PRIORS
+        assert self._read_json('params-indelible-wits-ddd-uk.json').get('priors') == WITS_INDELIBLE_PRIORS
 
     def test_wits_params_use_datag_reference_fasta_and_fai(self):
         """Wits templates must use the shared /dataG hg38 reference + fai where present."""

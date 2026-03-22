@@ -165,6 +165,21 @@ All required and optional parameters for each workflow are documented in the cor
 | `params/params-survivor.json` | `--workflow survivor` |
 | `params/params-truvari.json` | `--workflow truvari` |
 
+### Truth-label TSV requirements
+
+For `--workflow train`, the `truth_labels` input TSV must include the following columns:
+
+- `sample_id`
+- `chrom`
+- `start`
+- `end`
+- `cnv_type`
+- `truth_label`
+
+Example:
+- `truth_label = 1` for true CNV calls.
+- `truth_label = 0` for non-CNV calls.
+
 ## Running on the Wits UI Cluster
 
 The workflow has been tested on the **University of the Witwatersrand (Wits) UI HPC cluster**, which runs **Linux** and uses **SLURM** as its job scheduler.  Use the `wits` profile to activate the cluster-specific settings.

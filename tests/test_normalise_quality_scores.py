@@ -509,6 +509,16 @@ class TestNextflowConfigPysamLabel:
             "The 'pysam' container image path/URI must reference pysam"
         )
 
+    def test_pysam_container_uses_expected_biocontainers_tag(self, config_text):
+        pysam_block_match = re.search(
+            r"withLabel:\s*'pysam'\s*\{(.+?)(?=\})", config_text, re.DOTALL
+        )
+        assert pysam_block_match, "pysam label block not found in nextflow.config"
+        block = pysam_block_match.group(1)
+        assert (
+            "docker://quay.io/biocontainers/pysam:0.23.3--py313hd07c5dd_2" in block
+        ), "The pysam label must use the expected biocontainers pysam tag"
+
 
 # ===========================================================================
 # 6. DRAGEN QUAL normalisation chain

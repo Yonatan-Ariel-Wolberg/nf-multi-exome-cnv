@@ -25,6 +25,7 @@ MAIN_NF     = os.path.join(REPO_ROOT, 'main.nf')
 CONFIG_PATH = os.path.join(REPO_ROOT, 'nextflow.config')
 PARAMS_FILE = os.path.join(REPO_ROOT, 'params', 'params-train.json')
 SCRIPT_PATH = os.path.join(REPO_ROOT, 'bin', 'train_xgboost.py')
+TRAIN_DEF   = os.path.join(REPO_ROOT, 'bin', 'train.def')
 
 
 # ---------------------------------------------------------------------------
@@ -379,6 +380,32 @@ class TestParamsFile:
         assert 'truth_labels' in data, (
             'params-train.json must include a truth_labels key'
         )
+
+
+# ===========================================================================
+# 8. Apptainer recipe for train dependencies
+# ===========================================================================
+
+class TestTrainApptainerRecipe:
+    """bin/train.def must define the pinned train dependencies."""
+
+    def test_train_def_exists(self):
+        assert os.path.isfile(TRAIN_DEF), 'bin/train.def must exist'
+
+    def test_train_def_uses_expected_base_image(self):
+        with open(TRAIN_DEF) as fh:
+            text = fh.read()
+        assert 'Bootstrap: docker' in text
+        assert 'From: quay.io/condaforge/mambaforge:24.9.2-0' in text
+
+    def test_train_def_pins_expected_conda_packages(self):
+        with open(TRAIN_DEF) as fh:
+            text = fh.read()
+        assert 'xgboost=2.1.4' in text
+        assert 'scikit-learn=1.6.1' in text
+        assert 'imbalanced-learn=0.13.0' in text
+        assert 'pandas=2.2.3' in text
+        assert 'numpy=2.2.3' in text
 
 
 # ===========================================================================

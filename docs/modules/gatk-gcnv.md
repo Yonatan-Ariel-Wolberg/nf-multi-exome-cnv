@@ -6,7 +6,7 @@ GATK-gCNV performs cohort-mode germline CNV calling using interval annotations, 
 ## Processes in this module
 1. **GENERATE_PLOIDY_PRIORS** – generate ploidy priors for contigs.
 2. **PREPROCESS_INTERVALS** – preprocess and pad target intervals.
-3. **ANNOTATE_INTERVALS** – annotate intervals (for example GC content).
+3. **ANNOTATE_INTERVALS** – annotate intervals (e.g., GC content).
 4. **COLLECT_READ_COUNTS** – collect read counts into HDF5.
 5. **FILTER_INTERVALS** – remove unsuitable intervals.
 6. **DETERMINE_PLOIDY_COHORT** – infer ploidy across cohort.

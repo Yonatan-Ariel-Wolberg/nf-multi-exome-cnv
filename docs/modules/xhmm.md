@@ -34,3 +34,4 @@ XHMM calls CNVs from exome read depth using cohort-level depth matrices, PCA-bas
 
 ## Params template
 - `params/params-xhmm.json`
+- Default HMM config file used by the template: `params/xhmm.conf`

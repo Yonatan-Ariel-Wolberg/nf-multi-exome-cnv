@@ -182,7 +182,7 @@ class TestRequiredParamsValidation:
         assert "--workflow ${workflow_name} requires at least TWO caller VCF directories" in main_text
         assert "CALLER_DIR_PARAMS.collect { '--' + it }.join(', ')" in main_text
 
-    @pytest.mark.parametrize("workflow_name", list(PARAMS_FILES.keys()))
+    @pytest.mark.parametrize("workflow_name", [wf for wf in PARAMS_FILES.keys() if wf != "full"])
     def test_required_params_map_matches_params_templates(self, main_text, workflow_name):
         filename = PARAMS_FILES[workflow_name]
         data = _load_params(filename)
@@ -201,6 +201,15 @@ class TestRequiredParamsValidation:
                 f"Workflow '{workflow_name}' required params must include '{param_name}' "
                 f"(from params template), missing from REQUIRED_PARAMS_BY_WORKFLOW."
             )
+
+    def test_full_validation_requires_truth_labels(self, main_text):
+        assert "'full': ['truth_labels']" in main_text
+
+    def test_full_validation_requires_at_least_two_callers(self, main_text):
+        assert "configured_caller_count" in main_text
+        assert "configured_caller_count += 3" in main_text
+        assert "configured_caller_count < 2" in main_text
+        assert "--workflow full requires at least 2 configured CNV callers out of 7" in main_text
 
 
 # ===========================================================================

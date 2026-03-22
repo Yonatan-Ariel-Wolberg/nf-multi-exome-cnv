@@ -68,14 +68,7 @@ def REQUIRED_PARAMS_BY_WORKFLOW = [
     'feature_extraction': ['outdir', 'merged_vcf_dir', 'merger_mode'],
     'train': ['outdir', 'features_dir', 'truth_labels'],
     'evaluate': ['outdir', 'vcf_dir', 'caller', 'truth_bed', 'probes_bed'],
-    // The full workflow chains caller execution + consensus + feature extraction + train,
-    // so its required params intentionally mirror the full params/params-full.json template.
-    'full': [
-        'outdir', 'merger_mode', 'samplesheet_bams', 'fai', 'bams', 'fasta', 'targets',
-        'refflat', 'samples_path', 'dict', 'exome_targets', 'cramFilePairsUploadPath',
-        'crams', 'bam_file', 'reference_fasta', 'bed_file', 'mappability_file',
-        'indelible_counts', 'truth_labels', 'probes_bed'
-    ],
+    'full': ['truth_labels'],
 ]
 
 def is_param_set(param_name) {
@@ -97,6 +90,31 @@ def validate_required_params(workflow_name) {
         def configured_caller_dirs = CALLER_DIR_PARAMS.findAll { is_param_set(it) }
         if (configured_caller_dirs.size() < 2) {
             exit 1, "Error: --workflow ${workflow_name} requires at least TWO caller VCF directories. Configure at least 2 of: ${CALLER_DIR_PARAMS.collect { '--' + it }.join(', ')}"
+        }
+    }
+
+    if (workflow_name == 'full') {
+        def configured_caller_count = 0
+
+        if (['samplesheet_bams', 'fai'].every { is_param_set(it) }) {
+            // One config block enables 3 callers: CANOES, CLAMMS, XHMM
+            configured_caller_count += 3
+        }
+        if (['bams', 'fasta', 'targets', 'refflat'].every { is_param_set(it) }) {
+            configured_caller_count += 1
+        }
+        if (['samples_path', 'fasta', 'fai', 'dict', 'exome_targets'].every { is_param_set(it) }) {
+            configured_caller_count += 1
+        }
+        if (is_param_set('cramFilePairsUploadPath')) {
+            configured_caller_count += 1
+        }
+        if (is_param_set('crams')) {
+            configured_caller_count += 1
+        }
+
+        if (configured_caller_count < 2) {
+            exit 1, "Error: --workflow full requires at least 2 configured CNV callers out of 7 (CANOES, CLAMMS, XHMM, CNVKIT, GCNV, DRAGEN, INDELIBLE). Configure at least one of: (--samplesheet_bams + --fai) [enables 3 callers], (--bams + --fasta + --targets + --refflat), (--samples_path + --fasta + --fai + --dict + --exome_targets), (--cramFilePairsUploadPath), (--crams)."
         }
     }
 }

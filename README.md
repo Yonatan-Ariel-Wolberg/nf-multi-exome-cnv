@@ -149,6 +149,8 @@ nextflow run main.nf --workflow survivor -params-file params/params-survivor.jso
 nextflow run main.nf --workflow truvari -params-file params/params-truvari.json
 ```
 
+`survivor` / `truvari` only produce the consensus VCF outputs.
+
 ### Full end-to-end workflow (BAM/CRAM → XGBoost model)
 
 Use `--workflow full` to run available caller modules from BAM/CRAM inputs,
@@ -164,6 +166,16 @@ Notes:
 - At least **two** caller inputs must be configured so consensus merging can run.
 - Set `merger_mode` to `survivor` (default) or `truvari`.
 - `truth_labels` is required for the final `train` step.
+
+### Combined consensus + feature extraction workflows
+
+```bash
+nextflow run main.nf --workflow survivor_with_features -params-file params/params-survivor-with-features.json
+nextflow run main.nf --workflow truvari_with_features -params-file params/params-truvari-with-features.json
+```
+
+`*_with_features` workflows run the same consensus merge step as `survivor`/`truvari`,
+then immediately run `feature_extraction` on the merged outputs. They do **not** run `train`.
 
 ### Parameter files
 

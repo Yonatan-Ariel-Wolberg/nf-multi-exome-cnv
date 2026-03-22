@@ -214,3 +214,19 @@ class TestPrepareTrainingDataLegacy:
         df = self._make_df_supp(0)
         with pytest.raises(ValueError):
             tx.prepare_training_data(df, num_callers=0)
+
+
+# ===========================================================================
+# 6. truth-label schema / join contract
+# ===========================================================================
+
+class TestTruthLabelContract:
+
+    def test_truth_labels_required_columns_include_cnv_type(self, script_text):
+        assert "{'sample_id', 'chrom', 'start', 'end', 'cnv_type', 'truth_label'}" in script_text
+
+    def test_merge_uses_cnv_type_in_join_keys(self, script_text):
+        assert "on=['sample_id', 'chrom', 'start', 'end', 'cnv_type']" in script_text
+
+    def test_truth_labels_cli_help_mentions_cnv_type(self, script_text):
+        assert 'sample_id, chrom, start, end, cnv_type, truth_label' in script_text

@@ -389,6 +389,7 @@ class TestReadmeTrainTruthLabelsDocumentation:
         assert '`chrom`' in readme_text
         assert '`start`' in readme_text
         assert '`end`' in readme_text
+        assert '`cnv_type`' in readme_text
         assert '`truth_label`' in readme_text
 
     def test_readme_documents_true_label_value(self, readme_text):

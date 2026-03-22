@@ -378,10 +378,11 @@ The `--truth_labels` file must be a tab-delimited TSV containing at least:
 - `chrom`
 - `start`
 - `end`
+- `cnv_type` (e.g., `DEL` / `DUP`)
 - `truth_label`
 
 Rows are joined to the feature matrix using **exact** matches on
-`sample_id`, `chrom`, `start`, and `end` (inner join).
+`sample_id`, `chrom`, `start`, `end`, and `cnv_type` (inner join).
 
 For truthset CNVs that should be treated as **true positives** during
 training, set `truth_label = 1`. False positives should use
@@ -390,9 +391,9 @@ training, set `truth_label = 1`. False positives should use
 Example:
 
 ```tsv
-sample_id	chrom	start	end	truth_label
-SAMPLE_001	chr1	100000	130000	1
-SAMPLE_001	chr1	500000	520000	0
+sample_id	chrom	start	end	cnv_type	truth_label
+SAMPLE_001	chr1	100000	130000	DEL	1
+SAMPLE_001	chr1	500000	520000	DUP	0
 ```
 
 ---

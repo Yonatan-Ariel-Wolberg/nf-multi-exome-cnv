@@ -101,7 +101,7 @@ def main():
     ``*_features.tsv`` (the output pattern of ``feature_extraction.py``).
 
     The ``truth_labels`` TSV must contain at minimum the columns:
-        sample_id, chrom, start, end, truth_label
+        sample_id, chrom, start, end, cnv_type, truth_label
     where ``truth_label`` is 1 for a true CNV and 0 for a false positive.
     """
     parser = argparse.ArgumentParser(
@@ -115,7 +115,7 @@ def main():
     )
     parser.add_argument(
         '--truth_labels', required=True,
-        help='TSV file with columns: sample_id, chrom, start, end, truth_label.',
+        help='TSV file with columns: sample_id, chrom, start, end, cnv_type, truth_label.',
     )
     parser.add_argument(
         '--output_model', default='cnv_model.json',
@@ -148,7 +148,7 @@ def main():
 
     # ── Load truth labels ─────────────────────────────────────────────────────
     labels_df = pd.read_csv(args.truth_labels, sep='\t')
-    required_cols = {'sample_id', 'chrom', 'start', 'end', 'truth_label'}
+    required_cols = {'sample_id', 'chrom', 'start', 'end', 'cnv_type', 'truth_label'}
     missing_cols = required_cols - set(labels_df.columns)
     if missing_cols:
         sys.exit(
@@ -157,15 +157,15 @@ def main():
 
     # ── Merge features with truth labels ─────────────────────────────────────
     merged = features_df.merge(
-        labels_df[['sample_id', 'chrom', 'start', 'end', 'truth_label']],
-        on=['sample_id', 'chrom', 'start', 'end'],
+        labels_df[['sample_id', 'chrom', 'start', 'end', 'cnv_type', 'truth_label']],
+        on=['sample_id', 'chrom', 'start', 'end', 'cnv_type'],
         how='inner',
     )
 
     if merged.empty:
         sys.exit(
             "ERROR: No matching records found after joining features with truth labels. "
-            "Check that sample_id / chrom / start / end values align."
+            "Check that sample_id / chrom / start / end / cnv_type values align."
         )
 
     y = merged['truth_label']

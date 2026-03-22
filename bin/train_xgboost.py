@@ -6,7 +6,8 @@ import sys
 import pandas as pd
 import xgboost as xgb
 from imblearn.over_sampling import SMOTE
-from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.model_selection import StratifiedKFold, cross_val_score
+from sklearn.metrics import roc_curve, precision_recall_curve, auc, average_precision_score
 import numpy as np
 
 # All CNV callers supported by the pipeline.  Running all seven callers
@@ -227,6 +228,153 @@ def cross_validate_model(model, X, y, n_splits=5):
     print(f"Cross-validated F1 scores: {scores}")
     print(f"Mean F1 score: {scores.mean()}")
 
+
+def _write_line_plot_svg(path, x_values, y_values, title, x_label, y_label, add_diagonal=False):
+    width = 800
+    height = 600
+    margin_left = 80
+    margin_right = 40
+    margin_top = 60
+    margin_bottom = 70
+    plot_w = width - margin_left - margin_right
+    plot_h = height - margin_top - margin_bottom
+
+    x_arr = np.asarray(x_values, dtype=float)
+    y_arr = np.asarray(y_values, dtype=float)
+    x_min = float(np.nanmin(x_arr))
+    x_max = float(np.nanmax(x_arr))
+    y_min = 0.0
+    y_max = 1.0
+
+    if x_max == x_min:
+        x_max = x_min + 1.0
+
+    def sx(v):
+        return margin_left + ((float(v) - x_min) / (x_max - x_min)) * plot_w
+
+    def sy(v):
+        return margin_top + (1.0 - ((float(v) - y_min) / (y_max - y_min))) * plot_h
+
+    points = " ".join(f"{sx(x):.2f},{sy(y):.2f}" for x, y in zip(x_arr, y_arr))
+    diag = (
+        f'<line x1="{sx(x_min):.2f}" y1="{sy(y_min):.2f}" x2="{sx(x_max):.2f}" '
+        f'y2="{sy(y_max):.2f}" stroke="#999" stroke-width="1.5" stroke-dasharray="6 6" />'
+        if add_diagonal else ""
+    )
+
+    svg = f"""<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect x="0" y="0" width="{width}" height="{height}" fill="white" />
+  <text x="{width / 2:.1f}" y="30" text-anchor="middle" font-size="22" font-family="Arial">{title}</text>
+  <line x1="{margin_left}" y1="{height - margin_bottom}" x2="{width - margin_right}" y2="{height - margin_bottom}" stroke="#000" stroke-width="2" />
+  <line x1="{margin_left}" y1="{margin_top}" x2="{margin_left}" y2="{height - margin_bottom}" stroke="#000" stroke-width="2" />
+  {diag}
+  <polyline points="{points}" fill="none" stroke="#1f77b4" stroke-width="3" />
+  <text x="{width / 2:.1f}" y="{height - 20}" text-anchor="middle" font-size="16" font-family="Arial">{x_label}</text>
+  <text x="20" y="{height / 2:.1f}" text-anchor="middle" font-size="16" font-family="Arial" transform="rotate(-90 20,{height / 2:.1f})">{y_label}</text>
+</svg>
+"""
+    with open(path, 'w') as fh:
+        fh.write(svg)
+
+
+def _write_shap_bar_svg(path, feature_names, mean_abs_shap, top_n=20):
+    order = np.argsort(mean_abs_shap)[::-1][:top_n]
+    names = [feature_names[i] for i in order]
+    vals = [float(mean_abs_shap[i]) for i in order]
+
+    width = 1000
+    row_h = 26
+    margin_top = 60
+    margin_bottom = 30
+    margin_left = 320
+    margin_right = 60
+    plot_w = width - margin_left - margin_right
+    height = margin_top + margin_bottom + row_h * max(1, len(names))
+    max_v = max(vals) if vals else 1.0
+
+    bars = []
+    labels = []
+    for idx, (name, value) in enumerate(zip(names, vals)):
+        y = margin_top + idx * row_h
+        bar_w = (value / max_v) * plot_w if max_v > 0 else 0
+        bars.append(
+            f'<rect x="{margin_left}" y="{y + 4}" width="{bar_w:.2f}" height="16" fill="#d62728" />'
+        )
+        labels.append(
+            f'<text x="{margin_left - 8}" y="{y + 17}" text-anchor="end" font-size="12" font-family="Arial">{name}</text>'
+        )
+        labels.append(
+            f'<text x="{margin_left + bar_w + 6:.2f}" y="{y + 17}" text-anchor="start" font-size="11" font-family="Arial">{value:.4f}</text>'
+        )
+
+    svg = f"""<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect x="0" y="0" width="{width}" height="{height}" fill="white" />
+  <text x="{width / 2:.1f}" y="30" text-anchor="middle" font-size="22" font-family="Arial">SHAP summary (mean |value|)</text>
+  <line x1="{margin_left}" y1="{margin_top - 10}" x2="{margin_left}" y2="{height - margin_bottom}" stroke="#000" stroke-width="1" />
+  {''.join(bars)}
+  {''.join(labels)}
+</svg>
+"""
+    with open(path, 'w') as fh:
+        fh.write(svg)
+
+
+def _write_shap_beeswarm_svg(path, feature_names, shap_values, top_n=10, max_points_per_feature=300):
+    mean_abs = np.mean(np.abs(shap_values), axis=0)
+    order = np.argsort(mean_abs)[::-1][:top_n]
+    selected_names = [feature_names[i] for i in order]
+    selected_shap = shap_values[:, order]
+
+    width = 1000
+    row_h = 40
+    margin_top = 70
+    margin_bottom = 40
+    margin_left = 260
+    margin_right = 60
+    plot_w = width - margin_left - margin_right
+    height = margin_top + margin_bottom + row_h * max(1, len(selected_names))
+
+    x_abs_max = float(np.max(np.abs(selected_shap))) if selected_shap.size else 1.0
+    if x_abs_max == 0:
+        x_abs_max = 1.0
+
+    def sx(v):
+        return margin_left + ((float(v) + x_abs_max) / (2.0 * x_abs_max)) * plot_w
+
+    circles = []
+    labels = []
+    rng = np.random.default_rng(42)
+    for i, name in enumerate(selected_names):
+        y_center = margin_top + i * row_h + row_h / 2
+        row_vals = selected_shap[:, i]
+        if len(row_vals) > max_points_per_feature:
+            idx = np.linspace(0, len(row_vals) - 1, max_points_per_feature, dtype=int)
+            row_vals = row_vals[idx]
+        jitters = rng.uniform(-10, 10, size=len(row_vals))
+        for val, jitter in zip(row_vals, jitters):
+            circles.append(
+                f'<circle cx="{sx(val):.2f}" cy="{(y_center + jitter):.2f}" r="2.5" fill="#1f77b4" fill-opacity="0.55" />'
+            )
+        labels.append(
+            f'<text x="{margin_left - 8}" y="{y_center + 4:.2f}" text-anchor="end" font-size="12" font-family="Arial">{name}</text>'
+        )
+
+    x_zero = sx(0.0)
+    svg = f"""<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+  <rect x="0" y="0" width="{width}" height="{height}" fill="white" />
+  <text x="{width / 2:.1f}" y="30" text-anchor="middle" font-size="22" font-family="Arial">SHAP beeswarm (top features)</text>
+  <line x1="{x_zero:.2f}" y1="{margin_top - 12}" x2="{x_zero:.2f}" y2="{height - margin_bottom}" stroke="#666" stroke-width="1.5" stroke-dasharray="4 4" />
+  {''.join(circles)}
+  {''.join(labels)}
+  <text x="{width / 2:.1f}" y="{height - 10}" text-anchor="middle" font-size="16" font-family="Arial">SHAP value</text>
+</svg>
+"""
+    with open(path, 'w') as fh:
+        fh.write(svg)
+
 def main():
     """Entry point for command-line invocation from Nextflow or the shell.
 
@@ -274,6 +422,38 @@ def main():
     parser.add_argument(
         '--output_report', default='training_report.txt',
         help='Output path for the training metrics report.',
+    )
+    parser.add_argument(
+        '--output_roc_plot', default='roc_curve.svg',
+        help='Output path for ROC curve plot (SVG).',
+    )
+    parser.add_argument(
+        '--output_pr_plot', default='pr_curve.svg',
+        help='Output path for precision-recall curve plot (SVG).',
+    )
+    parser.add_argument(
+        '--output_roc_data', default='roc_curve.tsv',
+        help='Output path for ROC curve points TSV.',
+    )
+    parser.add_argument(
+        '--output_pr_data', default='pr_curve.tsv',
+        help='Output path for precision-recall curve points TSV.',
+    )
+    parser.add_argument(
+        '--output_shap_values', default='shap_values.tsv',
+        help='Output path for per-sample SHAP values TSV.',
+    )
+    parser.add_argument(
+        '--output_shap_summary_plot', default='shap_summary_bar.svg',
+        help='Output path for SHAP summary bar plot (SVG).',
+    )
+    parser.add_argument(
+        '--output_shap_beeswarm_plot', default='shap_summary_beeswarm.svg',
+        help='Output path for SHAP beeswarm plot (SVG).',
+    )
+    parser.add_argument(
+        '--shap_top_features', type=int, default=20,
+        help='Number of top features to include in SHAP summary plots.',
     )
     args = parser.parse_args()
     if args.min_shared_probes < 1:
@@ -340,6 +520,67 @@ def main():
     # ── Persist the trained model ─────────────────────────────────────────────
     model.save_model(args.output_model)
 
+    # ── Evaluation curves (ROC / PR) ─────────────────────────────────────────
+    y_score = model.predict_proba(X)[:, 1]
+    fpr, tpr, roc_thresholds = roc_curve(y, y_score)
+    precision, recall, pr_thresholds = precision_recall_curve(y, y_score)
+    roc_auc = auc(fpr, tpr)
+    pr_auc = average_precision_score(y, y_score)
+
+    pd.DataFrame({
+        'fpr': fpr,
+        'tpr': tpr,
+        'threshold': roc_thresholds,
+    }).to_csv(args.output_roc_data, sep='\t', index=False)
+
+    pr_thresholds_padded = np.append(pr_thresholds, np.nan)
+    pd.DataFrame({
+        'recall': recall,
+        'precision': precision,
+        'threshold': pr_thresholds_padded,
+    }).to_csv(args.output_pr_data, sep='\t', index=False)
+
+    _write_line_plot_svg(
+        args.output_roc_plot,
+        fpr,
+        tpr,
+        title=f'ROC curve (AUC={roc_auc:.4f})',
+        x_label='False positive rate',
+        y_label='True positive rate',
+        add_diagonal=True,
+    )
+    _write_line_plot_svg(
+        args.output_pr_plot,
+        recall,
+        precision,
+        title=f'Precision-Recall curve (AUPRC={pr_auc:.4f})',
+        x_label='Recall',
+        y_label='Precision',
+    )
+
+    # ── SHAP values and plots ────────────────────────────────────────────────
+    dmatrix = xgb.DMatrix(X, feature_names=list(X.columns))
+    contribs = model.get_booster().predict(dmatrix, pred_contribs=True)
+    shap_values = contribs[:, :-1]  # last column is the model bias term
+
+    shap_df = pd.DataFrame(shap_values, columns=X.columns)
+    shap_df.insert(0, 'sample_index', np.arange(len(shap_df)))
+    shap_df.to_csv(args.output_shap_values, sep='\t', index=False)
+
+    mean_abs_shap = np.mean(np.abs(shap_values), axis=0)
+    _write_shap_bar_svg(
+        args.output_shap_summary_plot,
+        list(X.columns),
+        mean_abs_shap,
+        top_n=max(1, args.shap_top_features),
+    )
+    _write_shap_beeswarm_svg(
+        args.output_shap_beeswarm_plot,
+        list(X.columns),
+        shap_values,
+        top_n=max(1, args.shap_top_features),
+    )
+
     # ── Write training report ─────────────────────────────────────────────────
     n_pos = int(y.sum())
     n_neg = int((y == 0).sum())
@@ -350,8 +591,17 @@ def main():
         fh.write(f"Probe-overlap matches:     {probe_match_count}\n")
         fh.write(f"True CNVs  (label=1):      {n_pos}\n")
         fh.write(f"False CNVs (label=0):      {n_neg}\n")
+        fh.write(f"ROC AUC:                   {roc_auc:.6f}\n")
+        fh.write(f"PR AUC:                    {pr_auc:.6f}\n")
         fh.write(f"Feature columns:           {list(X.columns)}\n")
         fh.write(f"Model saved to:            {args.output_model}\n")
+        fh.write(f"ROC plot:                  {args.output_roc_plot}\n")
+        fh.write(f"PR plot:                   {args.output_pr_plot}\n")
+        fh.write(f"ROC data:                  {args.output_roc_data}\n")
+        fh.write(f"PR data:                   {args.output_pr_data}\n")
+        fh.write(f"SHAP values:               {args.output_shap_values}\n")
+        fh.write(f"SHAP summary plot:         {args.output_shap_summary_plot}\n")
+        fh.write(f"SHAP beeswarm plot:        {args.output_shap_beeswarm_plot}\n")
 
     print(f"Model saved to {args.output_model}")
     print(f"Report written to {args.output_report}")

@@ -280,6 +280,21 @@ class TestTruthLabelContract:
     def test_reports_probe_overlap_matches(self, script_text):
         assert 'Probe-overlap matches' in script_text
 
+    def test_cli_supports_roc_and_pr_outputs(self, script_text):
+        assert '--output_roc_plot' in script_text
+        assert '--output_pr_plot' in script_text
+        assert '--output_roc_data' in script_text
+        assert '--output_pr_data' in script_text
+
+    def test_cli_supports_shap_outputs(self, script_text):
+        assert '--output_shap_values' in script_text
+        assert '--output_shap_summary_plot' in script_text
+        assert '--output_shap_beeswarm_plot' in script_text
+
+    def test_reports_auc_metrics(self, script_text):
+        assert 'ROC AUC:' in script_text
+        assert 'PR AUC:' in script_text
+
 
 # ===========================================================================
 # 7. probe-overlap fallback matching

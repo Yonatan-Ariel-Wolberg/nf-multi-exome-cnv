@@ -68,6 +68,8 @@ def REQUIRED_PARAMS_BY_WORKFLOW = [
     'feature_extraction': ['outdir', 'merged_vcf_dir', 'merger_mode'],
     'train': ['outdir', 'features_dir', 'truth_labels'],
     'evaluate': ['outdir', 'vcf_dir', 'caller', 'truth_bed', 'probes_bed'],
+    // The full workflow chains caller execution + consensus + feature extraction + train,
+    // so its required params intentionally mirror the full params/params-full.json template.
     'full': [
         'outdir', 'merger_mode', 'samplesheet_bams', 'fai', 'bams', 'fasta', 'targets',
         'refflat', 'samples_path', 'dict', 'exome_targets', 'cramFilePairsUploadPath',

@@ -182,24 +182,11 @@ class TestRequiredParamsValidation:
         assert "--workflow ${workflow_name} requires at least TWO caller VCF directories" in main_text
         assert "CALLER_DIR_PARAMS.collect { '--' + it }.join(', ')" in main_text
 
-    @pytest.mark.parametrize("workflow_name, expected_flags", [
-        ("canoes", ["--outdir", "--samplesheet_bams", "--ref", "--fai", "--probes", "--canoes_batch_size"]),
-        ("clamms", ["--outdir", "--samplesheet_bams", "--ref", "--fai", "--probes", "--interval_list", "--mappability", "--special_reg", "--sexinfo"]),
-        ("cnvkit", ["--outdir", "--bams", "--fasta", "--targets", "--refflat", "--test_size", "--test_list"]),
-        ("dragen", ["--outdir", "--projectId", "--pipelineId", "--cramFilePairsUploadPath", "--icaUploadPath"]),
-        ("evaluate", ["--outdir", "--vcf_dir", "--caller", "--truth_bed", "--probes_bed"]),
-        ("full", ["--outdir", "--merger_mode", "--samplesheet_bams", "--fai", "--bams", "--fasta", "--targets", "--refflat", "--samples_path", "--dict", "--exome_targets", "--cramFilePairsUploadPath", "--crams", "--truth_labels"]),
-        ("gcnv", ["--outdir", "--samples_path", "--fasta", "--fai", "--dict", "--exome_targets", "--bin_length", "--padding", "--is_wgs", "--scatter_count"]),
-        ("indelible", ["--outdir", "--crams", "--ref", "--priors", "--indelible_conf", "--fai"]),
-        ("normalise", ["--outdir", "--vcf_dir", "--caller"]),
-        ("survivor", ["--outdir", "--canoes_dir", "--clamms_dir", "--xhmm_dir", "--cnvkit_dir", "--gcnv_dir", "--dragen_dir", "--indelible_dir"]),
-        ("survivor_with_features", ["--outdir", "--canoes_dir", "--clamms_dir", "--xhmm_dir", "--cnvkit_dir", "--gcnv_dir", "--dragen_dir", "--indelible_dir", "--canoes_norm_dir", "--clamms_norm_dir", "--xhmm_norm_dir", "--cnvkit_norm_dir", "--gcnv_norm_dir", "--dragen_norm_dir", "--indelible_norm_dir", "--merger_mode"]),
-        ("train", ["--outdir", "--features_dir", "--truth_labels"]),
-        ("truvari", ["--outdir", "--canoes_dir", "--clamms_dir", "--xhmm_dir", "--cnvkit_dir", "--gcnv_dir", "--dragen_dir", "--indelible_dir"]),
-        ("truvari_with_features", ["--outdir", "--canoes_dir", "--clamms_dir", "--xhmm_dir", "--cnvkit_dir", "--gcnv_dir", "--dragen_dir", "--indelible_dir", "--canoes_norm_dir", "--clamms_norm_dir", "--xhmm_norm_dir", "--cnvkit_norm_dir", "--gcnv_norm_dir", "--dragen_norm_dir", "--indelible_norm_dir", "--merger_mode"]),
-        ("xhmm", ["--outdir", "--samplesheet_bams", "--ref", "--probes", "--xhmm_conf", "--xhmm_batch_size"]),
-    ])
-    def test_required_params_map_matches_params_templates(self, main_text, workflow_name, expected_flags):
+    @pytest.mark.parametrize("workflow_name", list(PARAMS_FILES.keys()))
+    def test_required_params_map_matches_params_templates(self, main_text, workflow_name):
+        filename = PARAMS_FILES[workflow_name]
+        data = _load_params(filename)
+        expected_params = [k for k in data.keys() if k != "workflow"]
         workflow_block = re.search(
             rf"'{re.escape(workflow_name)}':\s*\[(.*?)\]",
             main_text,
@@ -209,8 +196,7 @@ class TestRequiredParamsValidation:
             f"REQUIRED_PARAMS_BY_WORKFLOW must define a list for '{workflow_name}'"
         )
         block = workflow_block.group(1)
-        for flag in expected_flags:
-            param_name = flag.replace("--", "")
+        for param_name in expected_params:
             assert f"'{param_name}'" in block, (
                 f"Workflow '{workflow_name}' required params must include '{param_name}' "
                 f"(from params template), missing from REQUIRED_PARAMS_BY_WORKFLOW."

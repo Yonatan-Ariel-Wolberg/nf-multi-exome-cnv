@@ -1,7 +1,8 @@
 {
     "workflow":                     "dragen",
+    "outdir":                       "./results",
 
-    "bind_paths":                   "/dataB/aux,/dataG/ddd,/dataG/ddd-2023,/home/ywolberg",
+    "bind_paths":                   "/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
     "runOptions":                   "",
 
     "projectId":                    "/path/to/ica/project-id",
@@ -19,8 +20,8 @@
     "cramReferenceFileId":          "/path/to/ica/cram-reference-file-id",
     "targetBedFileId":              "/path/to/ica/target-bed-file-id",
 
-    "localDownloadPath":            "/dataG/ddd-2023/dragen_results",
-    "cramFilePairsUploadPath":      "/dataG/ddd/**/*",
+    "localDownloadPath":            "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/dragen_results",
+    "cramFilePairsUploadPath":      "/home/ywolberg/DECIPHERING_DD_DATA/{DDD_UK_DATA/bams,DDD_UK_DATA/crams,DDD_AFRICA_DATA/batch_3/organized_data/Extended,DDD_AFRICA_DATA/batch_3/organized_data/Father,DDD_AFRICA_DATA/batch_3/organized_data/Mother,DDD_AFRICA_DATA/batch_3/organized_data/Proband}/**/*.{bam,bam.bai,cram,cram.crai}",
     "icaUploadPath":                "/path/to/ica/upload/directory/",
 
     "maxUploadForks":               4,

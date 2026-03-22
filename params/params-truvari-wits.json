@@ -2,7 +2,7 @@
     "workflow": "truvari",
     "outdir": "./results",
 
-    "bind_paths":    "/dataB/aux,/dataG/ddd,/dataG/ddd-2023,/home/ywolberg",
+    "bind_paths":    "/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
     "runOptions":    "",
 
     "canoes_dir":    "./results/out_CANOES/vcfs",

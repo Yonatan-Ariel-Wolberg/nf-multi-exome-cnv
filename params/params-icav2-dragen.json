@@ -1,5 +1,6 @@
 {
     "workflow":                     "dragen",
+    "outdir":                       "./results",
     "projectId":                    "/path/to/ica/project-id",
     "pipelineId":                   "/path/to/ica/pipeline-id",
     "userReference":                "dragen_germline_enrichment_BATCH",

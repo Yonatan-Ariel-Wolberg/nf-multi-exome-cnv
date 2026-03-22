@@ -17,6 +17,7 @@ This module orchestrates ICAv2-based DRAGEN Germline Enrichment analysis: upload
 
 ## Required parameters
 - `workflow`: `dragen`
+- `outdir`
 - `projectId`
 - `pipelineId`
 - `userReference`
@@ -29,9 +30,10 @@ This module orchestrates ICAv2-based DRAGEN Germline Enrichment analysis: upload
 - `referenceFileId`
 - `cramReferenceFileId`
 - `targetBedFileId`
-- `localDownloadPath`
 - `cramFilePairsUploadPath`
 - `icaUploadPath`
+
+All DRAGEN analysis outputs are downloaded to `${outdir}/out_DRAGEN`.
 
 ## Commonly used optional parameters
 - `maxUploadForks`

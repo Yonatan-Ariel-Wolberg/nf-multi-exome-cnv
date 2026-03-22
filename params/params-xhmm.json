@@ -4,6 +4,6 @@
     "samplesheet_bams": "/path/to/samplesheet.tsv",
     "ref": "/path/to/reference.fasta",
     "probes": "/path/to/probes.bed",
-    "xhmm_conf": "/path/to/xhmm.conf",
+    "xhmm_conf": "params/xhmm.conf",
     "xhmm_batch_size": 50
 }

@@ -197,16 +197,41 @@ nextflow run main.nf \
 
 ### Cluster-specific bind mounts
 
-The global `singularity.runOptions` in `nextflow.config` binds several Wits file-system paths into every container:
+The global `singularity.runOptions` in `nextflow.config` binds the paths listed
+in `params.bind_paths` into every container. For the Wits DDD datasets, use:
 
 ```
 -B /dataB/aux
+-B /home/ywolberg
 -B /dataG/ddd
 -B /dataG/ddd-2023
--B /home/ywolberg
 ```
 
-Edit `params.runOptions` in `nextflow.config` (or pass `--runOptions` on the command line) if your data lives elsewhere on the cluster.
+Relevant Wits input globs used by the `params/*-wits.json` templates:
+
+- DDD-UK BAMs: `/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam,bam.bai}`
+- DDD-UK CRAMs: `/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams/**/*.{cram,cram.crai}`
+- DDD-AFRICA INDELIBLE family directories:
+  `/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/{Extended,Father,Mother,Proband}`
+
+The DDD files in `/home/ywolberg/DECIPHERING_DD_DATA/...` are symbolic links to
+`/dataG/ddd` and `/dataG/ddd-2023`, so both `/dataG` locations must be
+bind-mounted as well.
+
+Wits templates (except ICAv2-DRAGEN reference handling) use the shared
+`/dataG/ddd/data/resources` assets:
+
+- Reference FASTA:
+  `/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa`
+- Reference FAI:
+  `/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai`
+- Targets BED:
+  `/dataG/ddd/data/resources/canoes/probes_sanger.bed`
+- Targets interval list:
+  `/dataG/ddd/data/resources/canoes/probes_sanger.interval_list`
+
+Edit `params.runOptions` in `nextflow.config` (or pass `--runOptions` on the
+command line) if your data lives elsewhere on the cluster.
 
 ### GATK / Picard constraint
 

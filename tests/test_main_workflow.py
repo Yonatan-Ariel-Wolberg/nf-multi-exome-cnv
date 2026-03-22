@@ -482,20 +482,18 @@ class TestParamsJsonFiles:
     def test_params_file_has_outdir_key(self, workflow_name, filename):
         """Each params file must contain an output path key for result organisation.
 
-        Most workflows use 'outdir'. The ICAv2-DRAGEN cloud workflow instead uses
-        'localDownloadPath' because results are downloaded from ICA rather than
-        written to a local output directory.
+        Most workflows use 'outdir'. The ICAv2-DRAGEN cloud workflow requires both:
+        'outdir' for module-published outputs and 'localDownloadPath' as the ICA
+        download staging path.
         """
         path = os.path.join(PARAMS_DIR, filename)
         if not os.path.isfile(path):
             pytest.skip(f"{filename} does not exist")
         data = _load_params(filename)
-        # DRAGEN (ICAv2 cloud) uses localDownloadPath instead of outdir
-        has_output_path = "outdir" in data or "localDownloadPath" in data
+        has_output_path = "outdir" in data
         assert has_output_path, (
-            f"params/{filename} must contain either an 'outdir' key "
-            f"(local workflows) or 'localDownloadPath' (ICAv2-DRAGEN) "
-            f"specifying where results should be written"
+            f"params/{filename} must contain an 'outdir' key specifying where "
+            f"module outputs should be written"
         )
 
     @pytest.mark.parametrize("filename", [

@@ -6,8 +6,8 @@
     "runOptions": "",
 
     "bams":      "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam,bam.bai}",
-    "fasta":     "/dataB/aux/GRCh38/GCA_000001405.15_GRCh38_full_analysis_set.fna",
-    "targets":   "/dataB/aux/targets/targets.bed",
+    "fasta":     "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa",
+    "targets":   "/dataG/ddd/data/resources/canoes/probes_sanger.bed",
     "refflat":   "/dataB/aux/GRCh38/refFlat.txt",
     "test_size": -1,
     "test_list": "all"

@@ -504,6 +504,10 @@ WITS_WORKFLOWS = [
 PARAMS_CANOES_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'params-canoes-wits.json')
 DDD_UK_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam,bam.bai}"
 DDD_AFRICA_INDELIBLE_DIRS = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/{Extended,Father,Mother,Proband}"
+WITS_REF_FASTA = "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa"
+WITS_REF_FAI = "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
+WITS_TARGETS_BED = "/dataG/ddd/data/resources/canoes/probes_sanger.bed"
+WITS_TARGETS_INTERVAL_LIST = "/dataG/ddd/data/resources/canoes/probes_sanger.interval_list"
 
 
 class TestParamsWitsJson:
@@ -617,6 +621,40 @@ class TestParamsWitsJson:
     def test_wits_params_include_ddd_africa_indelible_dirs(self):
         """INDELIBLE must point to the DDD-AFRICA organized_data family directories."""
         assert self._read_json('params-indelible-wits.json').get('crams') == DDD_AFRICA_INDELIBLE_DIRS
+
+    def test_wits_params_use_datag_reference_fasta_and_fai(self):
+        """Wits templates must use the shared /dataG hg38 reference + fai where present."""
+        for filename, ref_key in (
+            ('params-canoes-wits.json', 'ref'),
+            ('params-clamms-wits.json', 'ref'),
+            ('params-cnvkit-wits.json', 'fasta'),
+            ('params-gatk-gcnv-wits.json', 'fasta'),
+            ('params-indelible-wits.json', 'ref'),
+            ('params-xhmm-wits.json', 'ref'),
+        ):
+            data = self._read_json(filename)
+            assert data.get(ref_key) == WITS_REF_FASTA, (
+                f"{filename} must set '{ref_key}' to the shared Wits hg38 FASTA"
+            )
+        for filename, fai_key in (
+            ('params-canoes-wits.json', 'fai'),
+            ('params-clamms-wits.json', 'fai'),
+            ('params-gatk-gcnv-wits.json', 'fai'),
+            ('params-indelible-wits.json', 'fai'),
+        ):
+            data = self._read_json(filename)
+            assert data.get(fai_key) == WITS_REF_FAI, (
+                f"{filename} must set '{fai_key}' to the shared Wits hg38 FAI"
+            )
+
+    def test_wits_params_use_datag_targets_bed_and_interval_list(self):
+        """Wits templates must use shared /dataG canoes targets BED and interval list."""
+        assert self._read_json('params-canoes-wits.json').get('probes') == WITS_TARGETS_BED
+        assert self._read_json('params-clamms-wits.json').get('probes') == WITS_TARGETS_BED
+        assert self._read_json('params-cnvkit-wits.json').get('targets') == WITS_TARGETS_BED
+        assert self._read_json('params-xhmm-wits.json').get('probes') == WITS_TARGETS_BED
+        assert self._read_json('params-clamms-wits.json').get('interval_list') == WITS_TARGETS_INTERVAL_LIST
+        assert self._read_json('params-gatk-gcnv-wits.json').get('exome_targets') == WITS_TARGETS_INTERVAL_LIST
 
     def test_wits_dragen_upload_glob_includes_uk_and_africa_locations(self):
         """DRAGEN upload glob must include DDD-UK and DDD-AFRICA BAM/CRAM roots."""

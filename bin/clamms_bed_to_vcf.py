@@ -222,8 +222,6 @@ def write_vcf_mutations(vcf_file, input_file, sample_file, individual_sample, lo
 
     for mutation in mutations_by_sample[individual_sample]:
         chr_num = mutation['CHROM']
-        if chr_num in ['X', 'Y', 'chrX', 'chrY']:
-            continue
 
         cnv = mutation['CNV_TYPE']
         start = mutation['START']

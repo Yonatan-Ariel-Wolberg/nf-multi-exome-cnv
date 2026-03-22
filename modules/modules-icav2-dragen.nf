@@ -513,7 +513,7 @@ process DOWNLOAD_ANALYSIS_OUTPUT {
     path "data_final.txt", emit: dataFile
 
     script:
-    def downloadPath = params.localDownloadPath
+    def downloadPath = "${outdir}/out_DRAGEN"
     """
     #!/bin/bash
     set -euo pipefail
@@ -529,6 +529,7 @@ process DOWNLOAD_ANALYSIS_OUTPUT {
         folder_id=\$(echo \${output_json} | jq -r ".items[0].data[0].dataId")
 
         if [ -n "\${folder_id}" ] && [ "\${folder_id}" != "null" ]; then
+            mkdir -p "${downloadPath}"
             echo "Downloading output folder \${folder_id} to ${downloadPath}..."
             icav2 projectdata download \${folder_id} "${downloadPath}"
             echo "outputFolderId:\${folder_id}" >> data_final.txt
@@ -611,7 +612,7 @@ process ADD_DRAGEN_TOOL_ANNOTATION {
     path "*_DRAGEN.annotated.vcf.gz", emit: annotated_vcfs, optional: true
 
     script:
-    def downloadPath = params.localDownloadPath
+    def downloadPath = "${outdir}/out_DRAGEN"
     """
     #!/bin/bash
     set -euo pipefail

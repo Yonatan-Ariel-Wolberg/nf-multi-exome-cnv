@@ -207,12 +207,16 @@ in `params.bind_paths` into every container. For the Wits DDD datasets, use:
 -B /dataG/ddd-2023
 ```
 
-Relevant Wits input globs used by the `params/*-wits.json` templates:
+Relevant Wits input paths used by the `params/*-wits.json` templates:
 
-- DDD-UK BAMs: `/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam,bam.bai}`
-- DDD-UK CRAMs: `/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams/**/*.{cram,cram.crai}`
-- DDD-AFRICA INDELIBLE family directories:
+- CANOES / CLAMMS / XHMM DDD-AFRICA samplesheet:
+  `/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/samplesheet.tsv`
+- CNVkit / GATK-gCNV DDD-AFRICA BAMs:
+  `/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/**/*.{bam,bam.bai}`
+- INDELIBLE DDD-AFRICA family directories:
   `/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/{Extended,Father,Mother,Proband}`
+- DRAGEN upload roots:
+  `/home/ywolberg/DECIPHERING_DD_DATA/{DDD_UK_DATA/bams,DDD_UK_DATA/crams,DDD_AFRICA_DATA/batch_3/organized_data/Proband}/**/*.{bam,bam.bai,cram,cram.crai}`
 
 The DDD files in `/home/ywolberg/DECIPHERING_DD_DATA/...` are symbolic links to
 `/dataG/ddd` and `/dataG/ddd-2023`, so both `/dataG` locations must be

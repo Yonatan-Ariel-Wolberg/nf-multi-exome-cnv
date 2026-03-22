@@ -502,7 +502,8 @@ WITS_WORKFLOWS = [
 ]
 
 PARAMS_CANOES_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'params-canoes-wits.json')
-DDD_UK_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam,bam.bai}"
+DDD_AFRICA_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/samplesheet.tsv"
+DDD_AFRICA_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/**/*.{bam,bam.bai}"
 DDD_AFRICA_INDELIBLE_DIRS = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/{Extended,Father,Mother,Proband}"
 WITS_REF_FASTA = "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa"
 WITS_REF_FAI = "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa.fai"
@@ -613,10 +614,13 @@ class TestParamsWitsJson:
                 "on the Wits cluster"
             )
 
-    def test_wits_params_include_ddd_uk_bam_glob(self):
-        """CNV workflows must point to the DDD-UK BAM/BAM.BAI location."""
-        assert self._read_json('params-cnvkit-wits.json').get('bams') == DDD_UK_BAM_GLOB
-        assert self._read_json('params-gatk-gcnv-wits.json').get('samples_path') == DDD_UK_BAM_GLOB
+    def test_wits_params_include_ddd_africa_for_joint_cnv_calling(self):
+        """DDD-AFRICA CRAM cohorts must be run jointly for CANOES/CLAMMS/XHMM/CNVkit/GATK-gCNV."""
+        assert self._read_json('params-canoes-wits.json').get('samplesheet_bams') == DDD_AFRICA_SAMPLESHEET
+        assert self._read_json('params-clamms-wits.json').get('samplesheet_bams') == DDD_AFRICA_SAMPLESHEET
+        assert self._read_json('params-xhmm-wits.json').get('samplesheet_bams') == DDD_AFRICA_SAMPLESHEET
+        assert self._read_json('params-cnvkit-wits.json').get('bams') == DDD_AFRICA_BAM_GLOB
+        assert self._read_json('params-gatk-gcnv-wits.json').get('samples_path') == DDD_AFRICA_BAM_GLOB
 
     def test_wits_params_include_ddd_africa_indelible_dirs(self):
         """INDELIBLE must point to the DDD-AFRICA organized_data family directories."""
@@ -656,16 +660,16 @@ class TestParamsWitsJson:
         assert self._read_json('params-clamms-wits.json').get('interval_list') == WITS_TARGETS_INTERVAL_LIST
         assert self._read_json('params-gatk-gcnv-wits.json').get('exome_targets') == WITS_TARGETS_INTERVAL_LIST
 
-    def test_wits_dragen_upload_glob_includes_uk_and_africa_locations(self):
-        """DRAGEN upload glob must include DDD-UK and DDD-AFRICA BAM/CRAM roots."""
+    def test_wits_dragen_upload_glob_includes_uk_and_africa_proband_only(self):
+        """DRAGEN upload glob must include DDD-UK and DDD-AFRICA Proband-only roots."""
         upload_glob = self._read_json('params-icav2-dragen-wits.json').get('cramFilePairsUploadPath', '')
         assert "/home/ywolberg/DECIPHERING_DD_DATA/" in upload_glob
         assert "DDD_UK_DATA/bams" in upload_glob
         assert "DDD_UK_DATA/crams" in upload_glob
-        assert "DDD_AFRICA_DATA/batch_3/organized_data/Extended" in upload_glob
-        assert "DDD_AFRICA_DATA/batch_3/organized_data/Father" in upload_glob
-        assert "DDD_AFRICA_DATA/batch_3/organized_data/Mother" in upload_glob
         assert "DDD_AFRICA_DATA/batch_3/organized_data/Proband" in upload_glob
+        assert "DDD_AFRICA_DATA/batch_3/organized_data/Extended" not in upload_glob
+        assert "DDD_AFRICA_DATA/batch_3/organized_data/Father" not in upload_glob
+        assert "DDD_AFRICA_DATA/batch_3/organized_data/Mother" not in upload_glob
         assert ".{bam,bam.bai,cram,cram.crai}" in upload_glob
 
     def test_params_wits_json_workflow_is_set(self):

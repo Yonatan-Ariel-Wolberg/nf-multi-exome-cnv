@@ -112,8 +112,15 @@ def create_vcf_contig_lines(fai_file):
     with open(fai_file) as fai:
         for line in fai:
             parts = line.strip().split("\t")
+            if len(parts) < 2:
+                logging.error(f"Malformed FAI line (expected >=2 columns): {line.strip()}")
+                continue
             contig_name = parts[0]
-            contig_length = int(parts[1])
+            try:
+                contig_length = int(parts[1])
+            except ValueError:
+                logging.error(f"Invalid contig length in FAI line: {line.strip()}")
+                continue
 
             contig_line = f"##contig=<ID={contig_name},length={contig_length}>"
             contig_lines.append(contig_line)
@@ -174,7 +181,8 @@ def write_vcf_mutations(vcf_file, input_file, sample_file, individual_sample, lo
             end = interval.split(':')[1].split('-')[1]
             svlen = safe_int(end) - safe_int(start) + 1
         except (IndexError, ValueError):
-            start, end, svlen = '0', '0', 0
+            logging.error(f"Malformed INTERVAL '{interval}' for sample {individual_sample}; skipping record")
+            continue
 
         info = (
             f"END={end};SVLEN={svlen};SVTYPE=CNV;TOOL=CANOES;"

@@ -125,6 +125,11 @@ def convert_clamms_bed_to_dict(input_file, sample_file, log_file=None):
                 sample_id = fields[4]
                 if sample_id in mutations_by_sample:
                     mutations_by_sample[sample_id].append(mutation)
+                else:
+                    logging.warning(
+                        f"Sample '{sample_id}' found in BED but missing from sample list; "
+                        "mutation will be ignored"
+                    )
 
     except IOError as e:
         logging.error(f"Error reading input BED file {input_file}: {e}")
@@ -162,8 +167,15 @@ def create_vcf_contig_lines(fai_file):
     with open(fai_file) as fai:
         for line in fai:
             parts = line.strip().split("\t")
+            if len(parts) < 2:
+                logging.error(f"Malformed FAI line (expected >=2 columns): {line.strip()}")
+                continue
             contig_name = parts[0]
-            contig_length = int(parts[1])
+            try:
+                contig_length = int(parts[1])
+            except ValueError:
+                logging.error(f"Invalid contig length in FAI line: {line.strip()}")
+                continue
 
             if contig_name in valid_contig_set:
                 contig_lines.append(f"##contig=<ID={contig_name},length={contig_length}>")

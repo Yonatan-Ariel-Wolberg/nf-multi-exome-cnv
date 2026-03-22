@@ -204,6 +204,44 @@ class TestCanoesCSVtoVCF:
                     f"CHROM field does not start with 'chr' in {fname}: got '{chrom}'"
                 )
 
+    def test_malformed_interval_row_is_skipped(self, sample_file, fai_file, tmp_path):
+        """Malformed INTERVAL values must be skipped instead of writing POS=0."""
+        import canoes_csv_to_vcf as mod
+
+        bad_csv = tmp_path / "canoes_bad_interval.csv"
+        bad_csv.write_text(
+            "SAMPLE\tCNV\tINTERVAL\tKB\tCHR\tMID_BP\tTARGETS\tNUM_TARG\tMLCN\tQ_SOME\n"
+            "SAMPLE1\tDEL\tBAD_INTERVAL\t1.0\t1\t1500\t1..2\t2\t1\t90.5\n"
+        )
+        out = str(tmp_path / "out")
+        mod.process_canoes_data(str(bad_csv), sample_file, fai_file, out)
+
+        vcf = os.path.join(out, "SAMPLE1_CANOES_output.vcf")
+        assert os.path.isfile(vcf)
+        _, data = _read_vcf_records(vcf)
+        assert data == [], "Malformed INTERVAL row should be skipped from VCF output"
+
+    def test_malformed_fai_lines_are_ignored(self, canoes_csv, sample_file, tmp_path):
+        """Malformed FAI lines should be ignored without crashing conversion."""
+        import canoes_csv_to_vcf as mod
+
+        bad_fai = tmp_path / "bad.fai"
+        bad_fai.write_text(
+            "chr1\t248956422\t112\t70\t71\n"
+            "chr2\n"
+            "chr3\tNOT_INT\t0\t70\t71\n"
+        )
+        out = str(tmp_path / "out")
+        mod.process_canoes_data(canoes_csv, sample_file, str(bad_fai), out)
+
+        vcf = os.path.join(out, "SAMPLE1_CANOES_output.vcf")
+        assert os.path.isfile(vcf)
+        header, _ = _read_vcf_records(vcf)
+        contig_lines = [l for l in header if l.startswith("##contig=")]
+        assert any("ID=chr1" in l for l in contig_lines)
+        assert not any("ID=chr2" in l for l in contig_lines)
+        assert not any("ID=chr3" in l for l in contig_lines)
+
 
 # ===========================================================================
 # CLAMMS
@@ -417,6 +455,44 @@ class TestCLAMMSBEDtoVCF:
         assert len(sample2_fields) > 1, "Expected SAMPLE2 VCF data row to be tab-delimited"
         assert sample1_fields[0] == "chrX", f"Expected CHROM field to be chrX, got {sample1_fields[0]}"
         assert sample2_fields[0] == "chrY", f"Expected CHROM field to be chrY, got {sample2_fields[0]}"
+
+    def test_bed_sample_not_in_sample_file_is_ignored(self, sample_file, fai_file, tmp_path):
+        """BED rows for samples not in sample list are ignored without creating VCFs."""
+        import clamms_bed_to_vcf as mod
+
+        bed = tmp_path / "clamms_unknown_sample.bed"
+        bed.write_text(
+            "chr1\t1000\t2000\tchr1:1000-2000\tUNKNOWN_SAMPLE\tDEL\t1\t5\t600\t50\t30\t800\t25\t1200\t15\t1100\t20\t1300\n"
+        )
+
+        out = str(tmp_path / "out")
+        mod.process_clamms_data(str(bed), sample_file, fai_file, out)
+
+        assert not os.path.exists(os.path.join(out, "UNKNOWN_SAMPLE_CLAMMS_output.vcf"))
+        # No known sample has calls in this input, so no VCFs should be created.
+        assert not os.path.exists(os.path.join(out, "SAMPLE1_CLAMMS_output.vcf"))
+        assert not os.path.exists(os.path.join(out, "SAMPLE2_CLAMMS_output.vcf"))
+
+    def test_clamms_malformed_fai_lines_are_ignored(self, clamms_bed, sample_file, tmp_path):
+        """Malformed FAI lines should be ignored while valid lines are retained."""
+        import clamms_bed_to_vcf as mod
+
+        bad_fai = tmp_path / "bad.fai"
+        bad_fai.write_text(
+            "chr1\t248956422\t112\t70\t71\n"
+            "chr2\n"
+            "chr3\tNOT_INT\t0\t70\t71\n"
+        )
+        out = str(tmp_path / "out")
+        mod.process_clamms_data(clamms_bed, sample_file, str(bad_fai), out)
+
+        vcf = os.path.join(out, "SAMPLE1_CLAMMS_output.vcf")
+        assert os.path.isfile(vcf)
+        header, _ = _read_vcf_records(vcf)
+        contig_lines = [l for l in header if l.startswith("##contig=")]
+        assert any("ID=chr1" in l for l in contig_lines)
+        assert not any("ID=chr2" in l for l in contig_lines)
+        assert not any("ID=chr3" in l for l in contig_lines)
 
 
 # ===========================================================================

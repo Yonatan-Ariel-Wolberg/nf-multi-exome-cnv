@@ -254,6 +254,7 @@ workflow CANOES {
 
     // Step 7: Reuse sample list from the first MERGE_READ_COUNTS output
     sample_list_ch = MERGE_READ_COUNTS.out.chr_reads_cov
+        .ifEmpty { error "CANOES received no merged chromosome read-count outputs. Check chromosome inputs and BAM batches." }
         .first()
         .map { chr, reads, sample_list -> sample_list }
 
@@ -275,5 +276,4 @@ workflow CANOES {
     normalised_vcf       = NORMALISE_CNV_QUALITY_SCORES.out.normalised_vcf
     normalised_vcf_index = NORMALISE_CNV_QUALITY_SCORES.out.normalised_vcf_index
 }
-
 

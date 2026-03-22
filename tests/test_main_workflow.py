@@ -194,6 +194,19 @@ class TestSubWorkflowDefinitions:
             "sorted VCFs may still contain non-normalised QUAL values"
         )
 
+    def test_run_cnvkit_guards_empty_bams(self, main_text):
+        """RUN_CNVKIT must fail fast with a clear error when BAM channel is empty."""
+        run_block = re.search(
+            r'workflow RUN_CNVKIT\s*\{(.+?)(?=\nworkflow |\Z)',
+            main_text, re.DOTALL,
+        )
+        assert run_block is not None, "RUN_CNVKIT workflow not found in main.nf"
+        body = run_block.group(1)
+        assert ".ifEmpty" in body, (
+            "RUN_CNVKIT should guard empty BAM input with .ifEmpty to avoid unclear "
+            "failures/hangs when bams.first() has no values."
+        )
+
 
 # ===========================================================================
 # 4. gather_vcfs() helper function

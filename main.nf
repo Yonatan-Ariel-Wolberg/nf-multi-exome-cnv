@@ -159,7 +159,9 @@ workflow RUN_CNVKIT {
         targets
         refflat
     main:
-        CNVKIT(bams, fasta, targets, refflat, bams.first().map { it[1] })
+        // Guard against empty BAM input so workflow fails fast with a clear error.
+        bams_nonempty = bams.ifEmpty { error "RUN_CNVKIT received no BAMs. Check --bams input/glob." }
+        CNVKIT(bams_nonempty, fasta, targets, refflat, bams_nonempty.first().map { it[1] })
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
                 CNVKIT.out.normalised_vcf.flatten(),

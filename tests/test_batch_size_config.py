@@ -270,6 +270,27 @@ class TestNormalisationDesign:
             "workflow to ensure all batches are merged before normalisation"
         )
 
+    def test_canoes_sample_list_channel_has_ifempty_guard(self):
+        """sample_list_ch derivation must fail fast if merged outputs are empty."""
+        with open(CANOES_MODULE) as f:
+            content = f.read()
+        assert "sample_list_ch = MERGE_READ_COUNTS.out.chr_reads_cov" in content, (
+            "Expected sample_list_ch assignment in CANOES workflow"
+        )
+        sample_assign_match = re.search(
+            r"sample_list_ch\s*=\s*MERGE_READ_COUNTS\.out\.chr_reads_cov(.+?)\.map\s*\{",
+            content,
+            re.DOTALL,
+        )
+        assert sample_assign_match is not None, (
+            "Could not locate sample_list_ch derivation chain in CANOES workflow"
+        )
+        chain_text = sample_assign_match.group(1)
+        assert ".ifEmpty" in chain_text, (
+            "sample_list_ch derivation should include .ifEmpty to avoid hanging "
+            "or unclear failures when MERGE_READ_COUNTS emits nothing."
+        )
+
     def test_xhmm_combine_precedes_filter_samples(self):
         """COMBINE_DOC must appear before FILTER_SAMPLES (which starts the
         normalisation pipeline) in the XHMM workflow block."""

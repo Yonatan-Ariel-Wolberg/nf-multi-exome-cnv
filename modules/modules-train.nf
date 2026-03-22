@@ -60,6 +60,13 @@ process TRAIN_XGBOOST {
     def probes_escaped = probes_bed ? probes_bed.toString().replace("'", "'\\''") : null
     def probes_arg = probes_escaped ? "--probes_bed '${probes_escaped}'" : ""
     """
+    mamba install -y -n base -c conda-forge \
+        xgboost \
+        scikit-learn \
+        imbalanced-learn \
+        pandas \
+        numpy
+
     python ${projectDir}/bin/train_xgboost.py \
         --features_dir   '.' \
         --truth_labels   '${truth_labels}' \

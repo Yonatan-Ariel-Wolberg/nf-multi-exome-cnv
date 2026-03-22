@@ -328,7 +328,7 @@ class TestNextflowConfigIntegration:
             re.DOTALL,
         )
         assert m, "withLabel: 'train' block not found"
-        assert "docker://quay.io/biocontainers/xgboost:2.0.3--py310h4aa3b51_0" in m.group(1)
+        assert "docker://quay.io/condaforge/mambaforge:24.9.2-0" in m.group(1)
 
     def test_train_label_rejects_legacy_py27_xgboost_container(self, config_text):
         m = re.search(

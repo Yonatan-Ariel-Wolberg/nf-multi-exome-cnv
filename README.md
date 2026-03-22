@@ -203,6 +203,8 @@ in `params.bind_paths` into every container. For the Wits DDD datasets, use:
 ```
 -B /dataB/aux
 -B /home/ywolberg
+-B /dataG/ddd
+-B /dataG/ddd-2023
 ```
 
 Relevant Wits input globs used by the `params/*-wits.json` templates:
@@ -211,6 +213,10 @@ Relevant Wits input globs used by the `params/*-wits.json` templates:
 - DDD-UK CRAMs: `/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams/**/*.{cram,cram.crai}`
 - DDD-AFRICA INDELIBLE family directories:
   `/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/{Extended,Father,Mother,Proband}`
+
+The DDD files in `/home/ywolberg/DECIPHERING_DD_DATA/...` are symbolic links to
+`/dataG/ddd` and `/dataG/ddd-2023`, so both `/dataG` locations must be
+bind-mounted as well.
 
 Edit `params.runOptions` in `nextflow.config` (or pass `--runOptions` on the
 command line) if your data lives elsewhere on the cluster.

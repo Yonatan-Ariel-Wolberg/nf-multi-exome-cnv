@@ -2,7 +2,7 @@
     "workflow": "canoes",
     "outdir": "./results",
 
-    "bind_paths": "/dataB/aux,/home/ywolberg",
+    "bind_paths": "/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
     "runOptions": "",
 
     "samplesheet_bams":  "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/samplesheet.tsv",

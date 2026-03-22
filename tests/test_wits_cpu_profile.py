@@ -553,7 +553,7 @@ class TestParamsWitsJson:
             filename = f'params-{wf}-wits.json'
             data = self._read_json(filename)
             bind_paths = data.get('bind_paths', '')
-            for expected_dir in ('/dataB/aux', '/home/ywolberg'):
+            for expected_dir in ('/dataB/aux', '/home/ywolberg', '/dataG/ddd', '/dataG/ddd-2023'):
                 assert expected_dir in bind_paths, (
                     f"{filename} bind_paths must include '{expected_dir}' — "
                     "this is where the reference data and DDD input roots are mounted "
@@ -600,7 +600,7 @@ class TestParamsWitsJson:
         """params-canoes-wits.json bind_paths must include required root mounts."""
         data = self._read_json('params-canoes-wits.json')
         bind_paths = data.get('bind_paths', '')
-        for expected_dir in ('/dataB/aux', '/home/ywolberg'):
+        for expected_dir in ('/dataB/aux', '/home/ywolberg', '/dataG/ddd', '/dataG/ddd-2023'):
             assert expected_dir in bind_paths, (
                 f"params-canoes-wits.json bind_paths must include '{expected_dir}' — "
                 "this is where the reference data and DDD input roots are mounted "

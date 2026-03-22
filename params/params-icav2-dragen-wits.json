@@ -1,7 +1,7 @@
 {
     "workflow":                     "dragen",
 
-    "bind_paths":                   "/dataB/aux,/home/ywolberg",
+    "bind_paths":                   "/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
     "runOptions":                   "",
 
     "projectId":                    "/path/to/ica/project-id",

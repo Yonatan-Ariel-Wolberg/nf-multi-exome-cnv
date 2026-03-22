@@ -2,7 +2,7 @@
     "workflow": "indelible",
     "outdir": "./results",
 
-    "bind_paths":      "/dataB/aux,/home/ywolberg",
+    "bind_paths":      "/dataB/aux,/home/ywolberg,/dataG/ddd,/dataG/ddd-2023",
     "runOptions":      "",
 
     "crams":           "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/{Extended,Father,Mother,Proband}",

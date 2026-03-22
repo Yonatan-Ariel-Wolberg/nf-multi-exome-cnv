@@ -393,3 +393,4 @@ class TestReadmeTrainTruthLabelsDocumentation:
 
     def test_readme_documents_true_label_value(self, readme_text):
         assert 'truth_label = 1' in readme_text
+        assert 'truth_label = 0' in readme_text

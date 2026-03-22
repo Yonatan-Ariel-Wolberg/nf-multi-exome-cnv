@@ -152,6 +152,65 @@ class TestWorkflowSwitchCases:
                 f"The default error message must list '--workflow {wf}' as a valid option"
             )
 
+    def test_workflow_switch_validates_required_params(self, main_text):
+        """main workflow should validate required params before dispatching the case."""
+        assert "validate_required_params(workflow_mode)" in main_text, (
+            "main workflow must call validate_required_params(workflow_mode) so users "
+            "get a clear list of missing required parameters per workflow."
+        )
+
+
+class TestRequiredParamsValidation:
+    """Required-parameter validation should list missing params per workflow."""
+
+    def test_required_params_map_includes_core_workflows(self, main_text):
+        assert "def REQUIRED_PARAMS_BY_WORKFLOW" in main_text
+        assert "def REQUIRED_PARAMS_BY_WORKFLOW = [" in main_text
+        for wf in [
+            "indelible", "canoes", "xhmm", "clamms", "dragen",
+            "cnvkit", "gcnv", "survivor", "truvari", "survivor_with_features",
+            "truvari_with_features", "normalise", "feature_extraction", "train",
+            "evaluate", "full",
+        ]:
+            assert f"'{wf}':" in main_text
+
+    def test_required_params_error_message_mentions_workflow_and_missing_flags(self, main_text):
+        assert "Missing required parameter(s) for --workflow ${workflow_name}" in main_text
+        assert "missing.collect { '--' + it }.join(', ')" in main_text
+
+    def test_consensus_validation_mentions_caller_vcf_directories(self, main_text):
+        assert "--workflow ${workflow_name} requires at least TWO caller VCF directories" in main_text
+        assert "CALLER_DIR_PARAMS.collect { '--' + it }.join(', ')" in main_text
+
+    @pytest.mark.parametrize("workflow_name", [wf for wf in PARAMS_FILES.keys() if wf != "full"])
+    def test_required_params_map_matches_params_templates(self, main_text, workflow_name):
+        filename = PARAMS_FILES[workflow_name]
+        data = _load_params(filename)
+        expected_params = [k for k in data.keys() if k != "workflow"]
+        workflow_block = re.search(
+            rf"'{re.escape(workflow_name)}':\s*\[(.*?)\]",
+            main_text,
+            re.DOTALL,
+        )
+        assert workflow_block is not None, (
+            f"REQUIRED_PARAMS_BY_WORKFLOW must define a list for '{workflow_name}'"
+        )
+        block = workflow_block.group(1)
+        for param_name in expected_params:
+            assert f"'{param_name}'" in block, (
+                f"Workflow '{workflow_name}' required params must include '{param_name}' "
+                f"(from params template), missing from REQUIRED_PARAMS_BY_WORKFLOW."
+            )
+
+    def test_full_validation_requires_truth_labels(self, main_text):
+        assert "'full': ['truth_labels']" in main_text
+
+    def test_full_validation_requires_at_least_two_callers(self, main_text):
+        assert "configured_caller_count" in main_text
+        assert "configured_caller_count += 3" in main_text
+        assert "configured_caller_count < 2" in main_text
+        assert "--workflow full requires at least 2 configured CNV callers out of 7" in main_text
+
 
 # ===========================================================================
 # 3. Sub-workflow definitions

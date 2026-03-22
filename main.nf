@@ -33,6 +33,94 @@ def CALLER_DIR_PARAMS = [
     'indelible_dir',
 ]
 
+def REQUIRED_PARAMS_BY_WORKFLOW = [
+    // Required params are aligned to the workflow-specific params/*.json templates.
+    'indelible': ['outdir', 'crams', 'ref', 'priors', 'indelible_conf', 'fai'],
+    'canoes': ['outdir', 'samplesheet_bams', 'ref', 'fai', 'probes', 'canoes_batch_size'],
+    'xhmm': ['outdir', 'samplesheet_bams', 'ref', 'probes', 'xhmm_conf', 'xhmm_batch_size'],
+    'clamms': ['outdir', 'samplesheet_bams', 'ref', 'fai', 'probes', 'interval_list', 'mappability', 'special_reg', 'sexinfo'],
+    'dragen': [
+        'outdir', 'projectId', 'pipelineId', 'userReference', 'storageSize',
+        'referenceAnalysisDataCode', 'targetBedAnalysisDataCode', 'cramAnalysisDataCode',
+        'cramIndexAnalysisDataCode', 'cramReferenceAnalysisDataCode', 'referenceFileId',
+        'cramReferenceFileId', 'targetBedFileId', 'localDownloadPath',
+        'cramFilePairsUploadPath', 'icaUploadPath', 'maxUploadForks', 'uploadRetries',
+        'fileStatusCheckInterval', 'fileStatusCheckLimit', 'analysisStatusCheckInterval',
+        'analysisStatusCheckLimit'
+    ],
+    'cnvkit': ['outdir', 'bams', 'fasta', 'targets', 'refflat', 'test_size', 'test_list'],
+    'gcnv': ['outdir', 'samples_path', 'fasta', 'fai', 'dict', 'exome_targets', 'bin_length', 'padding', 'is_wgs', 'scatter_count'],
+    'survivor': ['outdir', 'canoes_dir', 'clamms_dir', 'xhmm_dir', 'cnvkit_dir', 'gcnv_dir', 'dragen_dir', 'indelible_dir'],
+    'truvari': ['outdir', 'canoes_dir', 'clamms_dir', 'xhmm_dir', 'cnvkit_dir', 'gcnv_dir', 'dragen_dir', 'indelible_dir'],
+    'survivor_with_features': [
+        'outdir', 'canoes_dir', 'clamms_dir', 'xhmm_dir', 'cnvkit_dir', 'gcnv_dir',
+        'dragen_dir', 'indelible_dir', 'canoes_norm_dir', 'clamms_norm_dir',
+        'xhmm_norm_dir', 'cnvkit_norm_dir', 'gcnv_norm_dir', 'dragen_norm_dir',
+        'indelible_norm_dir', 'merger_mode'
+    ],
+    'truvari_with_features': [
+        'outdir', 'canoes_dir', 'clamms_dir', 'xhmm_dir', 'cnvkit_dir', 'gcnv_dir',
+        'dragen_dir', 'indelible_dir', 'canoes_norm_dir', 'clamms_norm_dir',
+        'xhmm_norm_dir', 'cnvkit_norm_dir', 'gcnv_norm_dir', 'dragen_norm_dir',
+        'indelible_norm_dir', 'merger_mode'
+    ],
+    'normalise': ['outdir', 'vcf_dir', 'caller'],
+    'feature_extraction': ['outdir', 'merged_vcf_dir', 'merger_mode'],
+    'train': ['outdir', 'features_dir', 'truth_labels'],
+    'evaluate': ['outdir', 'vcf_dir', 'caller', 'truth_bed', 'probes_bed'],
+    'full': ['truth_labels'],
+]
+
+def is_param_set(param_name) {
+    def value = params.get(param_name, null)
+    if (value == null) return false
+    if (value instanceof CharSequence) return value.toString().trim().length() > 0
+    return true
+}
+
+def validate_required_params(workflow_name) {
+    if (REQUIRED_PARAMS_BY_WORKFLOW.containsKey(workflow_name)) {
+        def missing = REQUIRED_PARAMS_BY_WORKFLOW[workflow_name].findAll { !is_param_set(it) }
+        if (!missing.isEmpty()) {
+            exit 1, "Error: Missing required parameter(s) for --workflow ${workflow_name}: ${missing.collect { '--' + it }.join(', ')}"
+        }
+    }
+
+    if (['survivor', 'truvari', 'survivor_with_features', 'truvari_with_features'].contains(workflow_name)) {
+        def configured_caller_dirs = CALLER_DIR_PARAMS.findAll { is_param_set(it) }
+        if (configured_caller_dirs.size() < 2) {
+            exit 1, "Error: --workflow ${workflow_name} requires at least TWO caller VCF directories. Configure at least 2 of: ${CALLER_DIR_PARAMS.collect { '--' + it }.join(', ')}"
+        }
+    }
+
+    if (workflow_name == 'full') {
+        def configured_caller_count = 0
+
+        if (['samplesheet_bams', 'fai'].every { is_param_set(it) }) {
+            // One config block enables 3 callers: CANOES, CLAMMS, XHMM
+            configured_caller_count += 3
+        }
+        if (['bams', 'fasta', 'targets', 'refflat'].every { is_param_set(it) }) {
+            configured_caller_count += 1
+        }
+        if (['samples_path', 'fasta', 'fai', 'dict', 'exome_targets'].every { is_param_set(it) }) {
+            configured_caller_count += 1
+        }
+        if (is_param_set('cramFilePairsUploadPath')) {
+            // DRAGEN
+            configured_caller_count += 1
+        }
+        if (is_param_set('crams')) {
+            // INDELIBLE
+            configured_caller_count += 1
+        }
+
+        if (configured_caller_count < 2) {
+            exit 1, "Error: --workflow full requires at least 2 configured CNV callers out of 7 (CANOES, CLAMMS, XHMM, CNVKIT, GCNV, DRAGEN, INDELIBLE). Configure at least one of: (--samplesheet_bams + --fai) [enables 3 callers], (--bams + --fasta + --targets + --refflat), (--samples_path + --fasta + --fai + --dict + --exome_targets), (--cramFilePairsUploadPath), (--crams)."
+        }
+    }
+}
+
 def extract_sample_id_from_vcf(f) {
     // Extract bare sample ID from per-caller VCF names used across modules,
     // including DRAGEN's ${sample_id}.cnv.vcf(.gz) convention.
@@ -331,6 +419,7 @@ workflow RUN_TRUVARI_WITH_FEATURES {
 // =====================================================================================
 
 workflow {
+    validate_required_params(workflow_mode)
     switch (workflow_mode) {
         
         case['indelible']:

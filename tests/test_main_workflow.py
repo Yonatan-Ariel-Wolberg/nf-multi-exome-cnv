@@ -152,6 +152,38 @@ class TestWorkflowSwitchCases:
                 f"The default error message must list '--workflow {wf}' as a valid option"
             )
 
+    def test_workflow_switch_validates_required_params(self, main_text):
+        """main workflow should validate required params before dispatching the case."""
+        assert "validate_required_params(workflow_mode)" in main_text, (
+            "main workflow must call validate_required_params(workflow_mode) so users "
+            "get a clear list of missing required parameters per workflow."
+        )
+
+
+class TestRequiredParamsValidation:
+    """Required-parameter validation should list missing params per workflow."""
+
+    def test_required_params_map_includes_core_workflows(self, main_text):
+        assert "def REQUIRED_PARAMS_BY_WORKFLOW" in main_text
+        for wf in ["canoes", "cnvkit", "gcnv", "normalise", "feature_extraction", "train", "evaluate"]:
+            assert f"'{wf}'" in main_text
+
+    def test_required_params_error_message_mentions_workflow_and_missing_flags(self, main_text):
+        assert "Missing required parameter(s) for --workflow ${workflow_name}" in main_text
+        assert "missing.collect { '--' + it }.join(', ')" in main_text
+
+    def test_consensus_validation_mentions_caller_vcf_directories(self, main_text):
+        assert "--workflow ${workflow_name} requires at least TWO caller VCF directories" in main_text
+        assert "CALLER_DIR_PARAMS.collect { '--' + it }.join(', ')" in main_text
+
+    def test_full_validation_requires_truth_labels(self, main_text):
+        assert "Missing required parameter(s) for --workflow full" in main_text
+        assert "'truth_labels'" in main_text
+
+    def test_full_validation_requires_two_caller_groups(self, main_text):
+        assert "--workflow full requires at least two configured caller input groups" in main_text
+        assert "full_caller_groups" in main_text
+
 
 # ===========================================================================
 # 3. Sub-workflow definitions

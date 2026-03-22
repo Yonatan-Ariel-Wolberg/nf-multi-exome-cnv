@@ -107,9 +107,11 @@ def validate_required_params(workflow_name) {
             configured_caller_count += 1
         }
         if (is_param_set('cramFilePairsUploadPath')) {
+            // DRAGEN
             configured_caller_count += 1
         }
         if (is_param_set('crams')) {
+            // INDELIBLE
             configured_caller_count += 1
         }
 

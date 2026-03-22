@@ -27,6 +27,7 @@ XHMM_MODULE     = os.path.join(REPO_ROOT, 'modules', 'modules-xhmm.nf')
 NEXTFLOW_CONFIG = os.path.join(REPO_ROOT, 'nextflow.config')
 PARAMS_CANOES   = os.path.join(REPO_ROOT, 'params', 'params-canoes.json')
 PARAMS_XHMM     = os.path.join(REPO_ROOT, 'params', 'params-xhmm.json')
+XHMM_CONF       = os.path.join(REPO_ROOT, 'params', 'xhmm.conf')
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +218,24 @@ class TestParamsJsonFiles:
         assert data['xhmm_batch_size'] == 50, (
             f"params-xhmm.json: expected xhmm_batch_size=50, "
             f"got {data['xhmm_batch_size']}"
+        )
+
+    def test_params_xhmm_json_uses_repo_xhmm_conf(self):
+        with open(PARAMS_XHMM) as f:
+            data = json.load(f)
+        assert data.get('xhmm_conf') == "params/xhmm.conf", (
+            "params-xhmm.json should reference the repository template "
+            "config at params/xhmm.conf"
+        )
+
+    def test_repo_xhmm_conf_exists_and_has_nine_fields(self):
+        assert os.path.isfile(XHMM_CONF), "params/xhmm.conf must exist"
+        with open(XHMM_CONF) as f:
+            line = f.read().strip()
+        fields = line.split()
+        assert len(fields) == 9, (
+            "params/xhmm.conf must contain one whitespace-delimited line "
+            "with 9 XHMM HMM parameters"
         )
 
 

@@ -33,6 +33,33 @@ def CALLER_DIR_PARAMS = [
     'indelible_dir',
 ]
 
+def extract_sample_id_from_vcf(f) {
+    return f.name
+        .replaceAll(/_(CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*/, '')
+        .replaceAll(/\.cnv\.vcf(\.gz)?$/i, '')
+        .replaceAll(/\.vcf(\.gz)?$/i, '')
+        .replaceAll(/\.sorted$/i, '')
+        .replaceAll(/\.normalised$/i, '')
+}
+
+def infer_caller_from_vcf(f) {
+    def n = f.name.toUpperCase()
+    if (n.contains('_CANOES'))    return 'canoes'
+    if (n.contains('_CLAMMS'))    return 'clamms'
+    if (n.contains('_XHMM'))      return 'xhmm'
+    if (n.contains('_CNVKIT'))    return 'cnvkit'
+    if (n.contains('_GCNV'))      return 'gatk_gcnv'
+    if (n.contains('_DRAGEN') || n.contains('.CNV.')) return 'dragen'
+    if (n.contains('_INDELIBLE')) return 'indelible'
+    return 'unknown'
+}
+
+def build_tool_vcfs_str(vcfs) {
+    return vcfs
+        .collect { vcf -> "${infer_caller_from_vcf(vcf)}=${vcf}" }
+        .join(',')
+}
+
 // =====================================================================================
 // HELPER FUNCTION: GATHER VCFS FOR CONSENSUS MODULES
 // =====================================================================================
@@ -40,13 +67,9 @@ def gather_vcfs() {
     def ch = Channel.empty()
     def dir_count = 0
     
-    // Helper closure to reliably extract the sample ID from various caller filenames.
-    // Also handles DRAGEN Germline Enrichment outputs named ${sample_id}.cnv.vcf.gz.
-    def get_id = { f -> f.name.replaceAll(/_(CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*/, '').replaceAll(/\.cnv\.vcf(\.gz)?$/i, '').replaceAll(/\.vcf(\.gz)?$/i, '') }
-
     CALLER_DIR_PARAMS.each { caller_dir ->
         if (params.get(caller_dir, false)) {
-            ch = ch.mix(Channel.fromPath(params[caller_dir] + "/*.vcf*").map { f -> [get_id(f), f] })
+            ch = ch.mix(Channel.fromPath(params[caller_dir] + "/*.vcf*").map { f -> [extract_sample_id_from_vcf(f), f] })
             dir_count++
         }
     }
@@ -491,6 +514,150 @@ workflow {
             )
             break
 
+        case['full']:
+            def caller_vcf_channels = []
+            def mergerMode = params.get('merger_mode', 'survivor')
+
+            if (params.get('samplesheet_bams', false) && params.get('fai', false)) {
+                Channel.fromPath(params.samplesheet_bams)
+                    .splitCsv(header: true, sep: '\t')
+                    .map { row -> [ "${row.SampleID}", "${row.BAM}", "${row.BAM}".replaceAll(/\.bam$/, '.bam.bai') ] }
+                    .set { ch_samplesheet_bams }
+                chroms = (1..22).toList().collect { 'chr' + "${it}" }
+                bam_list = ch_samplesheet_bams.collectFile() { item -> [ 'bam_list_unsorted.txt', "${item[1]}" + '\n' ] }
+                CANOES(bam_list, file(params.fai), Channel.from(chroms))
+                sample_list = ch_samplesheet_bams.map { it -> it[0] + '\n' }.collectFile(name: 'sample_list.txt')
+                CLAMMS(ch_samplesheet_bams, file(params.fai), sample_list)
+                XHMM(bam_list)
+                caller_vcf_channels << CANOES.out.normalised_vcf.flatten().map { f -> [extract_sample_id_from_vcf(f), f] }
+                caller_vcf_channels << CLAMMS.out.normalised_vcf.flatten().map { f -> [extract_sample_id_from_vcf(f), f] }
+                caller_vcf_channels << XHMM.out.normalised_vcf.flatten().map { f -> [extract_sample_id_from_vcf(f), f] }
+            }
+
+            if (
+                params.get('bams', false) &&
+                params.get('fasta', false) &&
+                params.get('targets', false) &&
+                params.get('refflat', false)
+            ) {
+                Channel.fromPath(params.bams.replaceAll(/\.bam$/, '.{bam,bai}'))
+                    .map { it -> [it.baseName, it] }.groupTuple(size: 2)
+                    .map { id, files -> [id, files.find { it.extension == 'bam' }, files.find { it.extension == 'bai' }] }
+                    .set { ch_bams_cnvkit }
+                def ch_bams_cnvkit_nonempty = ch_bams_cnvkit.ifEmpty { error "full workflow CNVkit step received no BAMs. Check --bams input/glob." }
+                CNVKIT(
+                    ch_bams_cnvkit_nonempty,
+                    file(params.fasta),
+                    file(params.targets),
+                    file(params.refflat),
+                    ch_bams_cnvkit_nonempty.first().map { it[1] }
+                )
+                caller_vcf_channels << CNVKIT.out.normalised_vcf.flatten().map { f -> [extract_sample_id_from_vcf(f), f] }
+            }
+
+            if (
+                params.get('samples_path', false) &&
+                params.get('fasta', false) &&
+                params.get('fai', false) &&
+                params.get('dict', false) &&
+                params.get('exome_targets', false)
+            ) {
+                Channel.fromPath(params.samples_path)
+                    .map { it ->
+                        def index = it.name.endsWith('.bam') ? "${it}.bai" : "${it}.crai"
+                        return [ it.baseName, it, file(index) ]
+                    }
+                    .set { ch_bams_gcnv }
+                GATK_GCNV(
+                    ch_bams_gcnv,
+                    file(params.fasta),
+                    file(params.fai),
+                    file(params.dict),
+                    file(params.exome_targets)
+                )
+                caller_vcf_channels << GATK_GCNV.out.normalised_vcf.flatten().map { f -> [extract_sample_id_from_vcf(f), f] }
+            }
+
+            if (params.get('cramFilePairsUploadPath', false)) {
+                Channel.fromFilePairs(
+                        ["${params.cramFilePairsUploadPath}"],
+                        checkIfExists: true
+                    ) { file -> file.name.replaceAll(/\.(cram\.crai|bam\.bai|cram|crai|bam|bai)$/, '') }
+                    .set { ch_cramPairs_full_dragen }
+                DRAGEN(ch_cramPairs_full_dragen)
+                caller_vcf_channels << DRAGEN.out.normalised_vcf.flatten().map { f -> [extract_sample_id_from_vcf(f), f] }
+            }
+
+            if (params.get('crams', false)) {
+                Channel.fromFilePairs([params.crams + '/*{.cram,.cram.crai}'])
+                    .map { it -> [ it[0][0..-6], it[1][0], it[1][1] ] }
+                    .filter { it -> it[1] =~ '_01_1' }
+                    .set { ch_crams_full }
+
+                Channel.fromFilePairs([params.crams + '/*{_01_1,_02_2,_03_3}*'], size: 6)
+                    .map { it -> [ it[0], it[1][0], it[1][1], it[1][2], it[1][3], it[1][4], it[1][5] ] }
+                    .set { ch_cram_trios_full }
+
+                Channel.fromFilePairs([params.crams + '/*{_01_1,_02_2,_03_3}*'], size: -1)
+                    .filter { it -> it[1].size() == 4 && it[1][3] =~ '02_2.cram' }
+                    .map { it -> [ it[0], it[1][0], it[1][1], it[1][2], it[1][3] ] }
+                    .set { ch_cram_mom_full }
+
+                Channel.fromFilePairs([params.crams + '/*{_01_1,_02_2,_03_3}*'], size: -1)
+                    .filter { it -> it[1].size() == 4 && it[1][3] =~ '03_3.cram' }
+                    .map { it -> [ it[0], it[1][0], it[1][1], it[1][2], it[1][3] ] }
+                    .set { ch_cram_dad_full }
+
+                INDELIBLE(ch_crams_full, ch_cram_trios_full, ch_cram_mom_full, ch_cram_dad_full)
+                caller_vcf_channels << INDELIBLE.out.normalised_vcf.flatten().map { f -> [extract_sample_id_from_vcf(f), f] }
+            }
+
+            if (caller_vcf_channels.size() < 2) {
+                exit 1, "Error: full workflow requires at least two callable CNV inputs so consensus and model training can run. Provide input params for >=2 callers."
+            }
+
+            def ch_vcfs = caller_vcf_channels[0]
+            caller_vcf_channels.drop(1).each { ch_part ->
+                ch_vcfs = ch_vcfs.mix(ch_part)
+            }
+
+            grouped_vcfs = group_caller_vcfs(ch_vcfs)
+
+            def bam_f       = params.get('bam_file',         false) ? file(params.bam_file)         : []
+            def fasta_f     = params.get('reference_fasta',  false) ? file(params.reference_fasta)  : []
+            def bed_f       = params.get('bed_file',         false) ? file(params.bed_file)         : []
+            def map_f       = params.get('mappability_file', false) ? file(params.mappability_file) : []
+            def indelible_f = params.get('indelible_counts', false) ? file(params.indelible_counts) : []
+
+            if (mergerMode == 'truvari') {
+                TRUVARI(grouped_vcfs)
+                feature_inputs_ch = TRUVARI.out.merged_vcf
+                    .join(TRUVARI.out.collapsed_vcf)
+                    .join(grouped_vcfs)
+                    .map { sample_id, merged_vcf, collapsed_vcf, vcfs ->
+                        [sample_id, merged_vcf, collapsed_vcf, build_tool_vcfs_str(vcfs), 'truvari',
+                         bam_f, fasta_f, bed_f, map_f, indelible_f]
+                    }
+                FEATURE_EXTRACTION(feature_inputs_ch)
+            } else {
+                SURVIVOR(grouped_vcfs)
+                feature_inputs_ch = SURVIVOR.out.union_vcf
+                    .join(grouped_vcfs)
+                    .map { sample_id, merged_vcf, vcfs ->
+                        [sample_id, merged_vcf, [], build_tool_vcfs_str(vcfs), 'survivor',
+                         bam_f, fasta_f, bed_f, map_f, indelible_f]
+                    }
+                FEATURE_EXTRACTION(feature_inputs_ch)
+            }
+
+            Channel.value(file(params.truth_labels))
+                .set { ch_truth_full }
+            def probesBedParamFull = params.get('probes_bed', false)
+            Channel.value(probesBedParamFull ? file(probesBedParamFull) : [])
+                .set { ch_probes_full }
+            TRAIN(FEATURE_EXTRACTION.out.features_tsv, ch_truth_full, ch_probes_full)
+            break
+
         default:
             exit 1, """
 OOOPS!! SEEMS LIKE WE HAVE A WORKFLOW ERROR!
@@ -512,6 +679,7 @@ Please use one of the following options for workflows:
     --workflow normalise
     --workflow train
     --workflow evaluate
+    --workflow full
 """
             break
     }

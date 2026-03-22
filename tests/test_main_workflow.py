@@ -65,6 +65,7 @@ PARAMS_FILES = {
     "truvari":                 "params-truvari.json",
     "survivor_with_features":  "params-survivor-with-features.json",
     "truvari_with_features":   "params-truvari-with-features.json",
+    "full":                    "params-full.json",
 }
 
 # Module names expected in include statements
@@ -664,6 +665,47 @@ class TestCombinedWorkflowWiring:
         assert "gather_vcfs()" in case_block.group(1), (
             "case['truvari_with_features'] must call gather_vcfs()"
         )
+
+
+# ===========================================================================
+# 10. full workflow wiring
+# ===========================================================================
+
+class TestFullWorkflowWiring:
+    """The full workflow mode must chain callers -> consensus -> features -> train."""
+
+    def _get_case_body(self, main_text):
+        m = re.search(r"case\['full'\](.+?)break", main_text, re.DOTALL)
+        assert m, "case['full'] block not found in main.nf"
+        return m.group(1)
+
+    def test_full_case_exists(self, main_text):
+        assert "case['full']" in main_text
+
+    def test_full_in_help_message(self, main_text):
+        assert "--workflow full" in main_text
+
+    def test_full_case_uses_group_caller_vcfs(self, main_text):
+        body = self._get_case_body(main_text)
+        assert "group_caller_vcfs" in body
+
+    def test_full_case_calls_feature_extraction(self, main_text):
+        body = self._get_case_body(main_text)
+        assert "FEATURE_EXTRACTION(" in body
+
+    def test_full_case_calls_train(self, main_text):
+        body = self._get_case_body(main_text)
+        assert "TRAIN(" in body
+
+    def test_full_case_supports_survivor_and_truvari(self, main_text):
+        body = self._get_case_body(main_text)
+        assert "SURVIVOR(" in body
+        assert "TRUVARI(" in body
+        assert "merger_mode" in body
+
+    def test_full_case_requires_truth_labels_for_training(self, main_text):
+        body = self._get_case_body(main_text)
+        assert "truth_labels" in body
 
 
 # ===========================================================================

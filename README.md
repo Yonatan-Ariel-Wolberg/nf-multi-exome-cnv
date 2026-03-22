@@ -149,6 +149,22 @@ nextflow run main.nf --workflow survivor -params-file params/params-survivor.jso
 nextflow run main.nf --workflow truvari -params-file params/params-truvari.json
 ```
 
+### Full end-to-end workflow (BAM/CRAM → XGBoost model)
+
+Use `--workflow full` to run available caller modules from BAM/CRAM inputs,
+merge caller outputs, extract features, and train the XGBoost model in one run.
+
+```bash
+nextflow run main.nf --workflow full -params-file params/params-full.json
+```
+
+Notes:
+- The full workflow automatically uses whichever caller inputs are configured in
+  `params/params-full.json`.
+- At least **two** caller inputs must be configured so consensus merging can run.
+- Set `merger_mode` to `survivor` (default) or `truvari`.
+- `truth_labels` is required for the final `train` step.
+
 ### Parameter files
 
 All required and optional parameters for each workflow are documented in the corresponding `params/*.json` template:
@@ -164,6 +180,7 @@ All required and optional parameters for each workflow are documented in the cor
 | `params/params-indelible.json` | `--workflow indelible` |
 | `params/params-survivor.json` | `--workflow survivor` |
 | `params/params-truvari.json` | `--workflow truvari` |
+| `params/params-full.json` | `--workflow full` |
 
 ### Truth-label TSV requirements
 

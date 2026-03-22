@@ -78,7 +78,7 @@ workflow RUN_INDELIBLE {
         INDELIBLE(crams, cram_trios, cram_mom, cram_dad)
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
-                INDELIBLE.out.sorted_vcf.flatten(),
+                INDELIBLE.out.normalised_vcf.flatten(),
                 file(params.truth_bed),
                 file(params.probes_bed),
                 'INDELIBLE'
@@ -96,7 +96,7 @@ workflow RUN_CANOES {
         CANOES(bam_list, fai, Channel.from(chroms))
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
-                CANOES.out.sorted_vcf.flatten(),
+                CANOES.out.normalised_vcf.flatten(),
                 file(params.truth_bed),
                 file(params.probes_bed),
                 'CANOES'
@@ -112,7 +112,7 @@ workflow RUN_XHMM {
         XHMM(bam_list)
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
-                XHMM.out.sorted_vcf.flatten(),
+                XHMM.out.normalised_vcf.flatten(),
                 file(params.truth_bed),
                 file(params.probes_bed),
                 'XHMM'
@@ -129,7 +129,7 @@ workflow RUN_CLAMMS {
         CLAMMS(bams, fai, sample_list)
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
-                CLAMMS.out.sorted_vcf.flatten(),
+                CLAMMS.out.normalised_vcf.flatten(),
                 file(params.truth_bed),
                 file(params.probes_bed),
                 'CLAMMS'
@@ -144,7 +144,7 @@ workflow RUN_DRAGEN {
         DRAGEN(cramPairs)
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
-                DRAGEN.out.sorted_vcf.flatten(),
+                DRAGEN.out.normalised_vcf.flatten(),
                 file(params.truth_bed),
                 file(params.probes_bed),
                 'DRAGEN'
@@ -162,7 +162,7 @@ workflow RUN_CNVKIT {
         CNVKIT(bams, fasta, targets, refflat, bams.first().map { it[1] })
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
-                CNVKIT.out.sorted_vcf.flatten(),
+                CNVKIT.out.normalised_vcf.flatten(),
                 file(params.truth_bed),
                 file(params.probes_bed),
                 'CNVKIT'
@@ -181,7 +181,7 @@ workflow RUN_GCNV {
         GATK_GCNV(bams, fasta, fai, dict, targets)
         if (params.get('truth_bed', false) && params.get('probes_bed', false)) {
             EVALUATE(
-                GATK_GCNV.out.sorted_vcf.flatten(),
+                GATK_GCNV.out.normalised_vcf.flatten(),
                 file(params.truth_bed),
                 file(params.probes_bed),
                 'GCNV'

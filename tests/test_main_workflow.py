@@ -168,6 +168,32 @@ class TestSubWorkflowDefinitions:
             f"for the {workflow_case} mode"
         )
 
+    @pytest.mark.parametrize("run_name, module_name", [
+        ("RUN_CANOES", "CANOES"),
+        ("RUN_XHMM", "XHMM"),
+        ("RUN_CLAMMS", "CLAMMS"),
+        ("RUN_DRAGEN", "DRAGEN"),
+        ("RUN_CNVKIT", "CNVKIT"),
+        ("RUN_GCNV", "GATK_GCNV"),
+        ("RUN_INDELIBLE", "INDELIBLE"),
+    ])
+    def test_evaluate_uses_normalised_vcf(self, main_text, run_name, module_name):
+        """RUN_* workflows must pass normalised VCFs into EVALUATE."""
+        run_block = re.search(
+            rf'workflow {re.escape(run_name)}\s*\{{(.+?)(?=\nworkflow |\Z)',
+            main_text, re.DOTALL,
+        )
+        assert run_block is not None, f"{run_name} workflow not found in main.nf"
+        body = run_block.group(1)
+        assert f"{module_name}.out.normalised_vcf" in body, (
+            f"{run_name} must pass {module_name}.out.normalised_vcf to EVALUATE "
+            "so QUAL_norm values in the QUAL column are used downstream"
+        )
+        assert f"{module_name}.out.sorted_vcf" not in body, (
+            f"{run_name} must not pass {module_name}.out.sorted_vcf to EVALUATE; "
+            "sorted VCFs may still contain non-normalised QUAL values"
+        )
+
 
 # ===========================================================================
 # 4. gather_vcfs() helper function

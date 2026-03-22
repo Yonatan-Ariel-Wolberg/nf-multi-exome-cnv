@@ -7,8 +7,8 @@ Validates that the DRAGEN module:
   2. Has a BGZIP_SORT_INDEX_VCF process to produce sorted, tabix-indexed VCFs.
   3. Chains annotation → sort/index → normalise in the DRAGEN workflow.
   4. Emits sorted_vcf and sorted_vcf_index from the DRAGEN workflow.
-  5. main.nf RUN_DRAGEN uses DRAGEN.out.sorted_vcf for EVALUATE (consistent
-     with all other callers: CANOES, CLAMMS, XHMM, GATK_GCNV, CNVKIT, INDELIBLE).
+5. main.nf RUN_DRAGEN uses DRAGEN.out.normalised_vcf for EVALUATE so
+   downstream checks use QUAL_norm from QUAL (consistent with other callers).
 """
 
 import os
@@ -232,22 +232,34 @@ class TestDragenNormaliseInputSuffix:
 
 
 # ---------------------------------------------------------------------------
-# 5. main.nf RUN_DRAGEN uses sorted_vcf for EVALUATE
+# 5. main.nf RUN_DRAGEN uses normalised_vcf for EVALUATE
 # ---------------------------------------------------------------------------
 
 class TestRunDragenEvaluateInput:
-    """RUN_DRAGEN sub-workflow must pass sorted_vcf to EVALUATE (consistent with other callers)."""
+    """RUN_DRAGEN sub-workflow must pass normalised_vcf to EVALUATE."""
 
-    def test_uses_sorted_vcf_for_evaluate(self, main_text):
+    def test_uses_normalised_vcf_for_evaluate(self, main_text):
         run_dragen = re.search(
             r'workflow RUN_DRAGEN\s*\{(.+?)(?=\nworkflow |\Z)',
             main_text, re.DOTALL
         )
         assert run_dragen is not None, "RUN_DRAGEN workflow not found in main.nf"
         body = run_dragen.group(1)
-        assert 'DRAGEN.out.sorted_vcf' in body, (
-            "RUN_DRAGEN must pass DRAGEN.out.sorted_vcf to EVALUATE, "
-            "consistent with other callers (e.g. CANOES.out.sorted_vcf)"
+        assert 'DRAGEN.out.normalised_vcf' in body, (
+            "RUN_DRAGEN must pass DRAGEN.out.normalised_vcf to EVALUATE "
+            "so downstream evaluation uses QUAL_norm in the QUAL column"
+        )
+
+    def test_does_not_use_sorted_vcf_for_evaluate(self, main_text):
+        run_dragen = re.search(
+            r'workflow RUN_DRAGEN\s*\{(.+?)(?=\nworkflow |\Z)',
+            main_text, re.DOTALL
+        )
+        assert run_dragen is not None, "RUN_DRAGEN workflow not found in main.nf"
+        body = run_dragen.group(1)
+        assert 'DRAGEN.out.sorted_vcf' not in body, (
+            "RUN_DRAGEN must NOT use DRAGEN.out.sorted_vcf for EVALUATE; "
+            "use DRAGEN.out.normalised_vcf to ensure QUAL_norm is used"
         )
 
     def test_does_not_use_annotated_vcfs_for_evaluate(self, main_text):
@@ -259,7 +271,7 @@ class TestRunDragenEvaluateInput:
         body = run_dragen.group(1)
         assert 'DRAGEN.out.annotated_vcfs' not in body, (
             "RUN_DRAGEN must NOT use DRAGEN.out.annotated_vcfs for EVALUATE; "
-            "use DRAGEN.out.sorted_vcf (sorted and tabix-indexed) instead"
+            "use DRAGEN.out.normalised_vcf instead"
         )
 
 

@@ -441,3 +441,68 @@ class TestNormaliseProcess:
             "NORMALISE_CNV_QUALITY_SCORES call must pass 'out_GCNV' as the dir_suffix "
             "argument (third positional arg) to match the shared process signature."
         )
+
+
+# ===========================================================================
+# 8. gcnv workflow numeric param validation in main.nf
+# ===========================================================================
+
+class TestGcnvParamValidation:
+    """validate_required_params in main.nf must validate numeric parameters for
+    the gcnv workflow: bin_length >= 0, padding >= 0, scatter_count > 0."""
+
+    @pytest.fixture(scope="class")
+    def main_text(self):
+        import os
+        main_nf = os.path.join(os.path.dirname(__file__), "..", "main.nf")
+        with open(main_nf) as fh:
+            return fh.read()
+
+    def test_gcnv_validation_block_present(self, main_text):
+        """validate_required_params must include a gcnv-specific validation block."""
+        assert "workflow_name == 'gcnv'" in main_text, (
+            "validate_required_params must contain a block checking "
+            "workflow_name == 'gcnv' to apply gcnv-specific param validation"
+        )
+
+    def test_bin_length_non_negative_check(self, main_text):
+        """bin_length must be validated as non-negative (>= 0) for gcnv workflow."""
+        assert "bin_length_val < 0" in main_text or \
+               "--bin_length must be a non-negative integer" in main_text, (
+            "validate_required_params must check that bin_length >= 0 for gcnv workflow"
+        )
+
+    def test_bin_length_error_message(self, main_text):
+        """The bin_length validation error must identify the param and the constraint."""
+        assert "--bin_length must be a non-negative integer for --workflow gcnv" in main_text, (
+            "Validation error message for bin_length must say "
+            "'--bin_length must be a non-negative integer for --workflow gcnv'"
+        )
+
+    def test_padding_non_negative_check(self, main_text):
+        """padding must be validated as non-negative (>= 0) for gcnv workflow."""
+        assert "padding_val < 0" in main_text or \
+               "--padding must be a non-negative integer" in main_text, (
+            "validate_required_params must check that padding >= 0 for gcnv workflow"
+        )
+
+    def test_padding_error_message(self, main_text):
+        """The padding validation error must identify the param and the constraint."""
+        assert "--padding must be a non-negative integer for --workflow gcnv" in main_text, (
+            "Validation error message for padding must say "
+            "'--padding must be a non-negative integer for --workflow gcnv'"
+        )
+
+    def test_scatter_count_positive_check(self, main_text):
+        """scatter_count must be validated as strictly positive (> 0) for gcnv workflow."""
+        assert "scatter_count_val <= 0" in main_text or \
+               "--scatter_count must be a positive integer" in main_text, (
+            "validate_required_params must check that scatter_count > 0 for gcnv workflow"
+        )
+
+    def test_scatter_count_error_message(self, main_text):
+        """The scatter_count validation error must identify the param and constraint."""
+        assert "--scatter_count must be a positive integer for --workflow gcnv" in main_text, (
+            "Validation error message for scatter_count must say "
+            "'--scatter_count must be a positive integer for --workflow gcnv'"
+        )

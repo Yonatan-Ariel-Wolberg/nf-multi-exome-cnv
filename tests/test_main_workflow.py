@@ -829,3 +829,135 @@ class TestFeatureExtractionCase:
             "case['feature_extraction'] in truvari mode must glob for "
             "*_truvari_merged.vcf* files"
         )
+
+
+# ===========================================================================
+# 11. Additional per-workflow param validation
+# ===========================================================================
+
+class TestBatchSizeAndNumericParamValidation:
+    """validate_required_params must validate numeric params for canoes, xhmm, cnvkit."""
+
+    def test_canoes_batch_size_positive_check(self, main_text):
+        """canoes_batch_size must be validated as positive (> 0) for canoes workflow."""
+        assert "canoes_batch_val <= 0" in main_text or \
+               "--canoes_batch_size must be a positive integer" in main_text, (
+            "validate_required_params must check that canoes_batch_size > 0 for canoes workflow"
+        )
+
+    def test_canoes_batch_size_error_message(self, main_text):
+        """The canoes_batch_size validation error must identify the param and constraint."""
+        assert "--canoes_batch_size must be a positive integer for --workflow canoes" in main_text, (
+            "Validation error for canoes_batch_size must say "
+            "'--canoes_batch_size must be a positive integer for --workflow canoes'"
+        )
+
+    def test_xhmm_batch_size_positive_check(self, main_text):
+        """xhmm_batch_size must be validated as positive (> 0) for xhmm workflow."""
+        assert "xhmm_batch_val <= 0" in main_text or \
+               "--xhmm_batch_size must be a positive integer" in main_text, (
+            "validate_required_params must check that xhmm_batch_size > 0 for xhmm workflow"
+        )
+
+    def test_xhmm_batch_size_error_message(self, main_text):
+        """The xhmm_batch_size validation error must identify the param and constraint."""
+        assert "--xhmm_batch_size must be a positive integer for --workflow xhmm" in main_text, (
+            "Validation error for xhmm_batch_size must say "
+            "'--xhmm_batch_size must be a positive integer for --workflow xhmm'"
+        )
+
+    def test_cnvkit_test_size_check(self, main_text):
+        """test_size must be -1 (disabled) or a positive integer for cnvkit workflow."""
+        assert "test_size_val != -1 && test_size_val <= 0" in main_text or \
+               "--test_size must be -1 (disabled) or a positive integer" in main_text, (
+            "validate_required_params must check that test_size is -1 or > 0 for cnvkit workflow"
+        )
+
+    def test_cnvkit_test_size_error_message(self, main_text):
+        """The test_size validation error must identify the param and allowed values."""
+        assert "--test_size must be -1 (disabled) or a positive integer for --workflow cnvkit" in main_text, (
+            "Validation error for test_size must say "
+            "'--test_size must be -1 (disabled) or a positive integer for --workflow cnvkit'"
+        )
+
+
+class TestMergerModeValidation:
+    """validate_required_params must validate merger_mode for feature_extraction,
+    survivor_with_features, and truvari_with_features workflows."""
+
+    WORKFLOWS_WITH_MERGER_MODE = [
+        'feature_extraction',
+        'survivor_with_features',
+        'truvari_with_features',
+    ]
+
+    def test_merger_mode_validation_present(self, main_text):
+        """validate_required_params must include a merger_mode validation block."""
+        assert "valid_merger_modes" in main_text, (
+            "validate_required_params must define valid_merger_modes for merger_mode validation"
+        )
+        assert "valid_merger_modes.contains" in main_text, (
+            "validate_required_params must check merger_mode against valid_merger_modes"
+        )
+
+    def test_valid_merger_modes_includes_survivor(self, main_text):
+        """The valid merger modes list must include 'survivor'."""
+        valid_block = re.search(
+            r"valid_merger_modes\s*=\s*\[(.+?)\]",
+            main_text,
+            re.DOTALL,
+        )
+        assert valid_block is not None, "valid_merger_modes list not found in main.nf"
+        block = valid_block.group(1)
+        assert "'survivor'" in block, (
+            "valid_merger_modes must include 'survivor' as a valid merger mode"
+        )
+
+    def test_valid_merger_modes_includes_truvari(self, main_text):
+        """The valid merger modes list must include 'truvari'."""
+        valid_block = re.search(
+            r"valid_merger_modes\s*=\s*\[(.+?)\]",
+            main_text,
+            re.DOTALL,
+        )
+        assert valid_block is not None, "valid_merger_modes list not found in main.nf"
+        block = valid_block.group(1)
+        assert "'truvari'" in block, (
+            "valid_merger_modes must include 'truvari' as a valid merger mode"
+        )
+
+    @pytest.mark.parametrize("workflow_name", WORKFLOWS_WITH_MERGER_MODE)
+    def test_merger_mode_validated_for_workflow(self, main_text, workflow_name):
+        """merger_mode validation must apply to all workflows that use it."""
+        assert workflow_name in main_text, (
+            f"'{workflow_name}' must be referenced in the merger_mode validation block"
+        )
+        # The validation block must cover this workflow name
+        assert f"'{workflow_name}'" in main_text, (
+            f"merger_mode validation block must reference '{workflow_name}'"
+        )
+
+    def test_merger_mode_validation_error_message(self, main_text):
+        """The merger_mode validation error must list valid values."""
+        assert "is not valid for --workflow" in main_text, (
+            "merger_mode validation error must state that the value is not valid for the workflow"
+        )
+        assert "Valid values are: 'survivor', 'truvari'" in main_text, (
+            "merger_mode validation error must list the valid values: 'survivor', 'truvari'"
+        )
+
+    def test_merger_mode_validation_is_case_insensitive(self, main_text):
+        """merger_mode validation must normalise to lower-case before comparing."""
+        validate_fn_block = re.search(
+            r"def validate_required_params\(.+?\n\}",
+            main_text,
+            re.DOTALL,
+        )
+        assert validate_fn_block is not None, (
+            "validate_required_params function not found in main.nf"
+        )
+        block = validate_fn_block.group(0)
+        assert "toLowerCase()" in block, (
+            "merger_mode validation must call .toLowerCase() to accept "
+            "'Survivor' or 'TRUVARI' in addition to lower-case values"
+        )

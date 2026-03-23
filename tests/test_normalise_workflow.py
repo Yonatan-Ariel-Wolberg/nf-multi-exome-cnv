@@ -24,6 +24,10 @@ NF_PATH     = os.path.join(REPO_ROOT, 'modules', 'modules-normalise.nf')
 MAIN_NF     = os.path.join(REPO_ROOT, 'main.nf')
 PARAMS_FILE = os.path.join(REPO_ROOT, 'params', 'params-normalise.json')
 
+# Valid caller names accepted by normalise_cnv_caller_quality_scores.py.
+# Note: GATK gCNV is 'GATK' (not 'GCNV') in the normalise script.
+VALID_NORMALISE_CALLERS = ['CANOES', 'CLAMMS', 'XHMM', 'GATK', 'CNVKIT', 'DRAGEN', 'INDELIBLE']
+
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -278,4 +282,82 @@ class TestParamsFile:
             data = json.load(fh)
         assert 'caller' in data, (
             'params-normalise.json must include a caller key'
+        )
+
+    def test_params_file_caller_value_is_valid(self):
+        """The default caller value in params-normalise.json must be a valid normalise caller."""
+        with open(PARAMS_FILE) as fh:
+            data = json.load(fh)
+        caller = data.get('caller', '').upper()
+        assert caller in VALID_NORMALISE_CALLERS, (
+            f"params-normalise.json 'caller' value '{data.get('caller')}' is not valid. "
+            f"Must be one of: {VALID_NORMALISE_CALLERS}"
+        )
+
+
+# ===========================================================================
+# 7. Caller validation in main.nf
+# ===========================================================================
+
+class TestCallerValidation:
+    """main.nf must validate --caller against the list of supported callers
+    for the normalise workflow before running any process."""
+
+    def test_valid_normalise_callers_defined(self, main_text):
+        """main.nf must define the VALID_NORMALISE_CALLERS constant list."""
+        assert 'VALID_NORMALISE_CALLERS' in main_text, (
+            "main.nf must define VALID_NORMALISE_CALLERS as a list of supported "
+            "caller names for the normalise workflow"
+        )
+
+    @pytest.mark.parametrize("caller", VALID_NORMALISE_CALLERS)
+    def test_valid_caller_names_listed(self, main_text, caller):
+        """Each valid caller name must appear in the VALID_NORMALISE_CALLERS definition."""
+        valid_callers_block = re.search(
+            r'VALID_NORMALISE_CALLERS\s*=\s*\[(.+?)\]',
+            main_text,
+            re.DOTALL,
+        )
+        assert valid_callers_block is not None, (
+            "VALID_NORMALISE_CALLERS must be defined as a list in main.nf"
+        )
+        block = valid_callers_block.group(1)
+        assert f"'{caller}'" in block, (
+            f"VALID_NORMALISE_CALLERS must include '{caller}' as a valid normalise caller"
+        )
+
+    def test_normalise_caller_validation_present(self, main_text):
+        """validate_required_params must include caller validation for normalise workflow."""
+        assert "workflow_name == 'normalise'" in main_text, (
+            "validate_required_params must check workflow_name == 'normalise' "
+            "to apply caller-specific validation"
+        )
+        assert "VALID_NORMALISE_CALLERS.contains" in main_text, (
+            "validate_required_params must check the caller against VALID_NORMALISE_CALLERS"
+        )
+
+    def test_normalise_caller_validation_error_message(self, main_text):
+        """The caller validation error must mention the invalid value and list valid callers."""
+        assert "is not a supported caller for --workflow normalise" in main_text, (
+            "Caller validation error must explain that the value is not a supported caller "
+            "for the normalise workflow"
+        )
+        assert "Valid values are:" in main_text, (
+            "Caller validation error must list the valid caller values"
+        )
+
+    def test_normalise_caller_validation_is_case_insensitive(self, main_text):
+        """The caller validation must normalise the input to upper-case before comparing."""
+        validate_fn_block = re.search(
+            r"def validate_required_params\(.+?\n\}",
+            main_text,
+            re.DOTALL,
+        )
+        assert validate_fn_block is not None, (
+            "validate_required_params function not found in main.nf"
+        )
+        block = validate_fn_block.group(0)
+        assert 'toUpperCase()' in block, (
+            "Caller validation must call .toUpperCase() so that lower-case input "
+            "(e.g. 'canoes') is accepted as well as 'CANOES'"
         )

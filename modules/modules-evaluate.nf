@@ -102,6 +102,7 @@ workflow EVALUATE {
     caller_name // val:  caller label used in output filenames (e.g. CANOES)
 
     main:
+    vcf_ch.ifEmpty { error "EVALUATE received no VCF files. Check that vcf_ch contains VCF file paths." }
     VCF_TO_BED(vcf_ch)
     COMBINE_BEDS(VCF_TO_BED.out.bed.collect(), caller_name)
     EVALUATE_CALLER(

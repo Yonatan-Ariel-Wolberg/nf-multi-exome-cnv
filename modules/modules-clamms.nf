@@ -307,7 +307,9 @@ workflow CLAMMS {
     NORMALIZE_DOC(SAMTOOLS_DOC.out.coverage, GENERATE_WINDOWS.out.windows)
 
     // Step 4: Collect normalized coverages and create PCA data
-    CREATE_PCA_DATA(NORMALIZE_DOC.out.norm_coverage.map { sample_id, norm_cov -> norm_cov }.collect())
+    norm_coverage_ch = NORMALIZE_DOC.out.norm_coverage.map { sample_id, norm_cov -> norm_cov }
+        .ifEmpty { error "CLAMMS: no normalized coverage files were produced. Check upstream BAM/sample inputs." }
+    CREATE_PCA_DATA(norm_coverage_ch.collect())
 
     // Step 5: Get Picard QC metrics per sample
     GET_PICARD_QC_METRICS(bam_ch)
@@ -346,7 +348,9 @@ workflow CLAMMS {
     CALL_CNVS(call_cnv_input_ch)
 
     // Step 10: Collect all CNV calls and filter
-    FILTER_CLAMMS_CNVS(CALL_CNVS.out.cnvs.map { sample_id, cnv_file -> cnv_file }.collect())
+    clamms_cnvs_ch = CALL_CNVS.out.cnvs.map { sample_id, cnv_file -> cnv_file }
+        .ifEmpty { error "CLAMMS: no CNV calls were produced. Check workflow inputs and model training outputs." }
+    FILTER_CLAMMS_CNVS(clamms_cnvs_ch.collect())
 
     // Step 11: Convert filtered BED to VCF
     CONVERT_CLAMMS_TO_VCF(

@@ -76,6 +76,7 @@ workflow SURVIVOR {
         grouped_vcfs
 
     main:
+        grouped_vcfs.ifEmpty { error "SURVIVOR received no VCF groups. Check that callers have produced VCF output." }
         RUN_SURVIVOR_MERGE(grouped_vcfs)
 
     emit:

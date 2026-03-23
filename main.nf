@@ -542,6 +542,7 @@ workflow {
                     ["${params.cramFilePairsUploadPath}"],
                     checkIfExists: true
                 ) { file -> file.name.replaceAll(/\.(cram\.crai|bam\.bai|cram|crai|bam|bai)$/, '') }
+                .ifEmpty { error "dragen workflow: no CRAM or BAM file pairs found in '${params.cramFilePairsUploadPath}'. Check that the path contains indexed CRAM/BAM files." }
                 .set { ch_cramPairs }
             RUN_DRAGEN(ch_cramPairs)
             break
@@ -750,6 +751,7 @@ workflow {
                         ["${params.cramFilePairsUploadPath}"],
                         checkIfExists: true
                     ) { file -> file.name.replaceAll(/\.(cram\.crai|bam\.bai|cram|crai|bam|bai)$/, '') }
+                    .ifEmpty { error "full workflow (DRAGEN path): no CRAM or BAM file pairs found in '${params.cramFilePairsUploadPath}'. Check that the path contains indexed CRAM/BAM files." }
                     .set { ch_cramPairs_full_dragen }
                 DRAGEN(ch_cramPairs_full_dragen)
                 caller_vcf_channels << DRAGEN.out.normalised_vcf.flatten().map { f -> [extract_sample_id_from_vcf(f), f] }
@@ -759,6 +761,7 @@ workflow {
                 Channel.fromFilePairs([params.crams + '/*{.cram,.cram.crai}'])
                     .map { it -> [ it[0][0..-6], it[1][0], it[1][1] ] }
                     .filter { it -> it[1] =~ '_01_1' }
+                    .ifEmpty { error "full workflow (INDELIBLE path): no proband CRAMs found in '${params.crams}'. Check that files follow the *_01_1.cram naming convention." }
                     .set { ch_crams_full }
 
                 Channel.fromFilePairs([params.crams + '/*{_01_1,_02_2,_03_3}*'], size: 6)

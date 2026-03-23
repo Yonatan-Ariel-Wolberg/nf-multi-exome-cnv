@@ -503,6 +503,7 @@ WITS_WORKFLOWS = [
 
 PARAMS_CANOES_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'params-canoes-wits.json')
 DDD_AFRICA_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/samplesheet.tsv"
+DDD_AFRICA_TOPLEVEL_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/samplesheet_africa.tsv"
 DDD_AFRICA_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/**/*.{bam,bam.bai}"
 DDD_AFRICA_INDELIBLE_DIRS = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/{Extended,Father,Mother,Proband}"
 WITS_REF_FASTA = "/dataG/ddd/data/resources/hg38/GRCh38_full_analysis_set_plus_decoy_hla.fa"
@@ -511,6 +512,7 @@ WITS_TARGETS_BED = "/dataG/ddd/data/resources/canoes/probes_sanger.bed"
 WITS_INDELIBLE_PRIORS = "/dataG/ddd/data/resources/indelible/Indelible_db_10k.hg38.bed"
 WITS_TARGETS_INTERVAL_LIST = "/dataG/ddd/data/resources/canoes/probes_sanger.interval_list"
 DDD_UK_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/samplesheet.tsv"
+DDD_UK_TOPLEVEL_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/samplesheet_uk.tsv"
 DDD_UK_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam,bam.bai}"
 DDD_UK_CRAM_DIR = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams"
 DDD_AFRICA_SEXINFO = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/sex_info.txt"
@@ -727,10 +729,10 @@ class TestRegionalWitsExampleParams:
 
     def test_ddd_africa_examples_point_to_ddd_africa_inputs(self):
         """DDD-AFRICA examples should reference DDD_AFRICA_DATA paths where applicable."""
-        assert self._read_json('params-canoes-wits-ddd-africa.json').get('samplesheet_bams') == DDD_AFRICA_SAMPLESHEET
-        assert self._read_json('params-clamms-wits-ddd-africa.json').get('samplesheet_bams') == DDD_AFRICA_SAMPLESHEET
+        assert self._read_json('params-canoes-wits-ddd-africa.json').get('samplesheet_bams') == DDD_AFRICA_TOPLEVEL_SAMPLESHEET
+        assert self._read_json('params-clamms-wits-ddd-africa.json').get('samplesheet_bams') == DDD_AFRICA_TOPLEVEL_SAMPLESHEET
         assert self._read_json('params-clamms-wits-ddd-africa.json').get('sexinfo') == DDD_AFRICA_SEXINFO
-        assert self._read_json('params-xhmm-wits-ddd-africa.json').get('samplesheet_bams') == DDD_AFRICA_SAMPLESHEET
+        assert self._read_json('params-xhmm-wits-ddd-africa.json').get('samplesheet_bams') == DDD_AFRICA_TOPLEVEL_SAMPLESHEET
         assert self._read_json('params-cnvkit-wits-ddd-africa.json').get('bams') == DDD_AFRICA_BAM_GLOB
         assert self._read_json('params-gatk-gcnv-wits-ddd-africa.json').get('samples_path') == DDD_AFRICA_BAM_GLOB
         assert self._read_json('params-indelible-wits-ddd-africa.json').get('crams') == DDD_AFRICA_INDELIBLE_DIRS
@@ -738,10 +740,10 @@ class TestRegionalWitsExampleParams:
 
     def test_ddd_uk_examples_point_to_ddd_uk_inputs_only(self):
         """DDD-UK examples should reference DDD_UK_DATA paths where applicable."""
-        assert self._read_json('params-canoes-wits-ddd-uk.json').get('samplesheet_bams') == DDD_UK_SAMPLESHEET
-        assert self._read_json('params-clamms-wits-ddd-uk.json').get('samplesheet_bams') == DDD_UK_SAMPLESHEET
+        assert self._read_json('params-canoes-wits-ddd-uk.json').get('samplesheet_bams') == DDD_UK_TOPLEVEL_SAMPLESHEET
+        assert self._read_json('params-clamms-wits-ddd-uk.json').get('samplesheet_bams') == DDD_UK_TOPLEVEL_SAMPLESHEET
         assert self._read_json('params-clamms-wits-ddd-uk.json').get('sexinfo') == DDD_UK_SEXINFO
-        assert self._read_json('params-xhmm-wits-ddd-uk.json').get('samplesheet_bams') == DDD_UK_SAMPLESHEET
+        assert self._read_json('params-xhmm-wits-ddd-uk.json').get('samplesheet_bams') == DDD_UK_TOPLEVEL_SAMPLESHEET
         assert self._read_json('params-cnvkit-wits-ddd-uk.json').get('bams') == DDD_UK_BAM_GLOB
         assert self._read_json('params-gatk-gcnv-wits-ddd-uk.json').get('samples_path') == DDD_UK_BAM_GLOB
         assert self._read_json('params-indelible-wits-ddd-uk.json').get('crams') == DDD_UK_CRAM_DIR

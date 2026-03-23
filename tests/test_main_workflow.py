@@ -268,6 +268,109 @@ class TestSubWorkflowDefinitions:
         )
 
 
+class TestWorkflowErrorHandling:
+    """Workflows should fail fast with clear errors for empty critical inputs."""
+
+    def test_dragen_case_guards_empty_file_pairs(self, main_text):
+        """dragen case should guard fromFilePairs output with .ifEmpty."""
+        dragen_case = re.search(
+            r"case\['dragen'\]:(.+?)break",
+            main_text,
+            re.DOTALL,
+        )
+        assert dragen_case is not None, "case['dragen'] block not found"
+        assert ".ifEmpty" in dragen_case.group(1), (
+            "case['dragen'] should guard Channel.fromFilePairs output with .ifEmpty"
+        )
+
+    def test_full_workflow_dragen_path_guards_empty_file_pairs(self, main_text):
+        """full workflow DRAGEN path should guard empty file pairs with .ifEmpty."""
+        full_case = re.search(r"case\['full'\]:(.+?)(?:\ndefault:|\Z)", main_text, re.DOTALL)
+        assert full_case is not None, "case['full'] block not found"
+        dragen_section = re.search(
+            r"if\s*\(\s*params\.get\('cramFilePairsUploadPath', false\)\s*\)\s*\{(.+?)DRAGEN\(ch_cramPairs_full_dragen\)",
+            full_case.group(1),
+            re.DOTALL,
+        )
+        assert dragen_section is not None, "full workflow DRAGEN section not found"
+        assert ".ifEmpty" in dragen_section.group(1), (
+            "full workflow DRAGEN section should guard Channel.fromFilePairs output with .ifEmpty"
+        )
+
+    def test_full_workflow_indelible_path_guards_empty_proband_crams(self, main_text):
+        """full workflow INDELIBLE path should guard empty proband CRAM channel."""
+        full_case = re.search(r"case\['full'\]:(.+?)(?:\ndefault:|\Z)", main_text, re.DOTALL)
+        assert full_case is not None, "case['full'] block not found"
+        indelible_section = re.search(
+            r"if\s*\(\s*params\.get\('crams', false\)\s*\)\s*\{(.+?)INDELIBLE\(ch_crams_full,",
+            full_case.group(1),
+            re.DOTALL,
+        )
+        assert indelible_section is not None, "full workflow INDELIBLE section not found"
+        assert ".ifEmpty" in indelible_section.group(1), (
+            "full workflow INDELIBLE section should guard proband CRAM channel with .ifEmpty"
+        )
+
+    def test_survivor_workflow_guards_empty_grouped_vcfs(self):
+        """SURVIVOR module workflow should guard grouped_vcfs with .ifEmpty."""
+        module_path = os.path.join(REPO_ROOT, "modules", "modules-survivor.nf")
+        with open(module_path) as fh:
+            text = fh.read()
+        workflow_block = re.search(r"workflow SURVIVOR\s*\{(.+?)(?=\n\}|$)", text, re.DOTALL)
+        assert workflow_block is not None, "workflow SURVIVOR not found in modules-survivor.nf"
+        assert ".ifEmpty" in workflow_block.group(1), (
+            "workflow SURVIVOR should guard grouped_vcfs with .ifEmpty"
+        )
+
+    def test_truvari_workflow_guards_empty_grouped_vcfs(self):
+        """TRUVARI module workflow should guard grouped_vcfs with .ifEmpty."""
+        module_path = os.path.join(REPO_ROOT, "modules", "modules-truvari.nf")
+        with open(module_path) as fh:
+            text = fh.read()
+        workflow_block = re.search(r"workflow TRUVARI\s*\{(.+?)(?=\n\}|$)", text, re.DOTALL)
+        assert workflow_block is not None, "workflow TRUVARI not found in modules-truvari.nf"
+        assert ".ifEmpty" in workflow_block.group(1), (
+            "workflow TRUVARI should guard grouped_vcfs with .ifEmpty"
+        )
+
+    def test_evaluate_workflow_guards_empty_vcf_input(self):
+        """EVALUATE module workflow should guard vcf_ch with .ifEmpty."""
+        module_path = os.path.join(REPO_ROOT, "modules", "modules-evaluate.nf")
+        with open(module_path) as fh:
+            text = fh.read()
+        workflow_block = re.search(r"workflow EVALUATE\s*\{(.+?)(?=\n\}|$)", text, re.DOTALL)
+        assert workflow_block is not None, "workflow EVALUATE not found in modules-evaluate.nf"
+        assert ".ifEmpty" in workflow_block.group(1), (
+            "workflow EVALUATE should guard vcf_ch with .ifEmpty"
+        )
+
+    def test_train_workflow_guards_empty_features_input(self):
+        """TRAIN module workflow should guard features_tsv_ch with .ifEmpty."""
+        module_path = os.path.join(REPO_ROOT, "modules", "modules-train.nf")
+        with open(module_path) as fh:
+            text = fh.read()
+        workflow_block = re.search(r"workflow TRAIN\s*\{(.+?)(?=\n\}|$)", text, re.DOTALL)
+        assert workflow_block is not None, "workflow TRAIN not found in modules-train.nf"
+        assert ".ifEmpty" in workflow_block.group(1), (
+            "workflow TRAIN should guard features_tsv_ch with .ifEmpty"
+        )
+
+    def test_clamms_workflow_guards_critical_collect_inputs(self):
+        """CLAMMS module workflow should guard critical channels before .collect()."""
+        module_path = os.path.join(REPO_ROOT, "modules", "modules-clamms.nf")
+        with open(module_path) as fh:
+            text = fh.read()
+        workflow_block = re.search(r"workflow CLAMMS\s*\{(.+?)(?=\n\}|$)", text, re.DOTALL)
+        assert workflow_block is not None, "workflow CLAMMS not found in modules-clamms.nf"
+        body = workflow_block.group(1)
+        assert re.search(r"norm_coverage_ch\s*=\s*.+?\.ifEmpty\s*\{", body, re.DOTALL), (
+            "workflow CLAMMS should guard normalized coverage channel with .ifEmpty before collect"
+        )
+        assert re.search(r"clamms_cnvs_ch\s*=\s*.+?\.ifEmpty\s*\{", body, re.DOTALL), (
+            "workflow CLAMMS should guard CNV call channel with .ifEmpty before collect"
+        )
+
+
 # ===========================================================================
 # 4. gather_vcfs() helper function
 # ===========================================================================

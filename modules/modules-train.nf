@@ -101,6 +101,7 @@ workflow TRAIN {
         probes_bed_ch
 
     main:
+        features_tsv_ch.ifEmpty { error "TRAIN received no feature TSV files. Check that features_tsv_ch is not empty." }
         TRAIN_XGBOOST(features_tsv_ch.collect(), truth_labels_ch, probes_bed_ch)
 
     emit:

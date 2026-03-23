@@ -104,7 +104,7 @@ workflow TRUVARI {
         grouped_vcfs
 
     main:
-        grouped_vcfs.ifEmpty { error "TRUVARI received no VCF groups. At least 2 callers must provide VCFs for the same sample." }
+        grouped_vcfs.ifEmpty { error "TRUVARI received no VCF groups. Check that callers have produced VCF output." }
         MERGE_VCFS(grouped_vcfs)
         COLLAPSE_VCFS(MERGE_VCFS.out.merged_data)
 

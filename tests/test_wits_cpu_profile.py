@@ -515,6 +515,7 @@ DDD_UK_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams/**/*.{bam
 DDD_UK_CRAM_DIR = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams"
 DDD_AFRICA_SEXINFO = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/sex_info.txt"
 DDD_UK_SEXINFO = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/sex_info.txt"
+WITS_XHMM_CONF = "/dataG/ddd/data/resources/xhmm/params.txt"
 
 
 class TestParamsWitsJson:
@@ -671,6 +672,19 @@ class TestParamsWitsJson:
         assert self._read_json('params-xhmm-wits.json').get('probes') == WITS_TARGETS_BED
         assert self._read_json('params-clamms-wits.json').get('interval_list') == WITS_TARGETS_INTERVAL_LIST
         assert self._read_json('params-gatk-gcnv-wits.json').get('exome_targets') == WITS_TARGETS_INTERVAL_LIST
+
+    def test_wits_xhmm_params_use_datag_xhmm_conf(self):
+        """All Wits XHMM templates must point xhmm_conf to the shared /dataG resource."""
+        for filename in (
+            'params-xhmm-wits.json',
+            'params-xhmm-wits-ddd-africa.json',
+            'params-xhmm-wits-ddd-uk.json',
+        ):
+            data = self._read_json(filename)
+            assert data.get('xhmm_conf') == WITS_XHMM_CONF, (
+                f"{filename} must set 'xhmm_conf' to the shared Wits XHMM params "
+                f"at {WITS_XHMM_CONF}"
+            )
 
     def test_wits_dragen_upload_glob_includes_uk_and_africa_proband_only(self):
         """DRAGEN upload glob must include DDD-UK and DDD-AFRICA Proband-only roots."""

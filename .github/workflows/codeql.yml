@@ -145,18 +145,18 @@ jobs:
         distribution: temurin
         java-version: '17'
 
-    - name: Install Groovy
+    - name: Install Nextflow
       shell: bash
       run: |
-        sudo apt-get update
-        sudo apt-get install -y groovy
+        curl -s https://get.nextflow.io | bash
+        sudo mv nextflow /usr/local/bin/
 
     - name: Analyze Nextflow scripts
       shell: bash
       run: |
         if find . -type f -name '*.nf' -print -quit | grep -q .; then
           while IFS= read -r -d '' file; do
-            groovy -e "new GroovyShell().parse(new File(args[0]))" "$file"
+            nextflow run "$file" -dsl2 -stub-run
           done < <(find . -type f -name '*.nf' -print0)
         else
           echo "No Nextflow scripts found."

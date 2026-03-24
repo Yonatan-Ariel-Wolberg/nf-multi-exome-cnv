@@ -520,17 +520,20 @@ DDD_UK_SEXINFO = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/sex_info.txt"
 WITS_XHMM_CONF = "/dataG/ddd/data/resources/xhmm/params.txt"
 
 
+def _wits_params_path(filename):
+    if filename.endswith('-wits-ddd-africa.json'):
+        return os.path.join(REPO_ROOT, 'params', 'ddd-africa', filename)
+    if filename.endswith('-wits-ddd-uk.json'):
+        return os.path.join(REPO_ROOT, 'params', 'ddd-uk', filename)
+    return os.path.join(REPO_ROOT, 'params', 'wits', filename)
+
+
 class TestParamsWitsJson:
     """params/wits/params-*-wits.json files must exist for every workflow."""
 
     def _read_json(self, filename):
         import json
-        if filename.endswith('-wits-ddd-africa.json'):
-            path = os.path.join(REPO_ROOT, 'params', 'ddd-africa', filename)
-        elif filename.endswith('-wits-ddd-uk.json'):
-            path = os.path.join(REPO_ROOT, 'params', 'ddd-uk', filename)
-        else:
-            path = os.path.join(REPO_ROOT, 'params', 'wits', filename)
+        path = _wits_params_path(filename)
         with open(path) as fh:
             return json.load(fh)
 
@@ -718,12 +721,7 @@ class TestRegionalWitsExampleParams:
 
     def _read_json(self, filename):
         import json
-        if filename.endswith('-wits-ddd-africa.json'):
-            path = os.path.join(REPO_ROOT, 'params', 'ddd-africa', filename)
-        elif filename.endswith('-wits-ddd-uk.json'):
-            path = os.path.join(REPO_ROOT, 'params', 'ddd-uk', filename)
-        else:
-            path = os.path.join(REPO_ROOT, 'params', 'wits', filename)
+        path = _wits_params_path(filename)
         with open(path) as fh:
             return json.load(fh)
 
@@ -764,7 +762,7 @@ class TestRegionalWitsExampleParams:
 
 
 class TestParamsDirectoryLayout:
-    """Required params subdirectories for regional/general template organisation."""
+    """Required params subdirectories for regional/general template organization."""
 
     def test_required_params_subdirectories_exist(self):
         """params must include ddd-africa, ddd-uk, wits, and general directories."""

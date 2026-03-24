@@ -30,4 +30,4 @@ InDelible identifies structural insertion/deletion events from split-read eviden
 - `truth_bed`, `probes_bed` (only when running automatic evaluation in `main.nf`)
 
 ## Params template
-- `params/params-indelible.json`
+- `params/general/params-indelible.json`

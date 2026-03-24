@@ -23,5 +23,5 @@ This module transforms merged consensus CNV VCFs into per-sample feature matrice
   - `indelible_counts`
 
 ## Params templates
-- `params/params-survivor-with-features.json` (for SURVIVOR-derived merged VCFs)
-- `params/params-truvari-with-features.json` (for Truvari-derived merged VCFs)
+- `params/general/params-survivor-with-features.json` (for SURVIVOR-derived merged VCFs)
+- `params/general/params-truvari-with-features.json` (for Truvari-derived merged VCFs)

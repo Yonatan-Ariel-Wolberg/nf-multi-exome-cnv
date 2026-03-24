@@ -20,4 +20,4 @@ Truvari consensus calling first merges per-caller VCFs per sample, then collapse
   - `indelible_dir`
 
 ## Params template
-- `params/params-truvari.json`
+- `params/general/params-truvari.json`

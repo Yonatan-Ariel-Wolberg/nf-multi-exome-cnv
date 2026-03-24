@@ -20,4 +20,4 @@ SURVIVOR performs distance-based CNV merging across multiple callers per sample 
   - `indelible_dir`
 
 ## Params template
-- `params/params-survivor.json`
+- `params/general/params-survivor.json`

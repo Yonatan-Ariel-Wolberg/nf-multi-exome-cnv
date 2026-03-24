@@ -27,4 +27,4 @@ CANOES is an exome CNV caller based on read-depth over target probes. In this pi
 - `truth_bed`, `probes_bed` (only when running automatic evaluation in `main.nf`)
 
 ## Params template
-- `params/params-canoes.json`
+- `params/general/params-canoes.json`

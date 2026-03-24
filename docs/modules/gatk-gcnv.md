@@ -33,4 +33,4 @@ GATK-gCNV performs cohort-mode germline CNV calling using interval annotations, 
 - `truth_bed`, `probes_bed` (only when running automatic evaluation in `main.nf`)
 
 ## Params template
-- `params/params-gatk-gcnv.json`
+- `params/general/params-gatk-gcnv.json`

@@ -493,7 +493,7 @@ class TestBindPaths:
 
 
 # ===========================================================================
-# 8. params/params-*-wits.json – Wits-specific templates (one per workflow)
+# 8. params/wits/params-*-wits.json – Wits-specific templates (one per workflow)
 # ===========================================================================
 
 WITS_WORKFLOWS = [
@@ -501,7 +501,7 @@ WITS_WORKFLOWS = [
     'icav2-dragen', 'indelible', 'survivor', 'truvari', 'xhmm',
 ]
 
-PARAMS_CANOES_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'params-canoes-wits.json')
+PARAMS_CANOES_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'wits', 'params-canoes-wits.json')
 DDD_AFRICA_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/samplesheet.tsv"
 DDD_AFRICA_TOPLEVEL_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/samplesheet_africa.tsv"
 DDD_AFRICA_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/**/*.{bam,bam.bai}"
@@ -521,11 +521,16 @@ WITS_XHMM_CONF = "/dataG/ddd/data/resources/xhmm/params.txt"
 
 
 class TestParamsWitsJson:
-    """params/params-*-wits.json files must exist for every workflow."""
+    """params/wits/params-*-wits.json files must exist for every workflow."""
 
     def _read_json(self, filename):
         import json
-        path = os.path.join(REPO_ROOT, 'params', filename)
+        if filename.endswith('-wits-ddd-africa.json'):
+            path = os.path.join(REPO_ROOT, 'params', 'ddd-africa', filename)
+        elif filename.endswith('-wits-ddd-uk.json'):
+            path = os.path.join(REPO_ROOT, 'params', 'ddd-uk', filename)
+        else:
+            path = os.path.join(REPO_ROOT, 'params', 'wits', filename)
         with open(path) as fh:
             return json.load(fh)
 
@@ -533,7 +538,7 @@ class TestParamsWitsJson:
         """A params-<workflow>-wits.json file must exist for each workflow."""
         for wf in WITS_WORKFLOWS:
             filename = f'params-{wf}-wits.json'
-            path = os.path.join(REPO_ROOT, 'params', filename)
+            path = os.path.join(REPO_ROOT, 'params', 'wits', filename)
             assert os.path.isfile(path), (
                 f"{filename} must exist as a ready-to-use template for "
                 "running the workflow on the ZA-Wits-Core HPC cluster"
@@ -544,7 +549,7 @@ class TestParamsWitsJson:
         import json
         for wf in WITS_WORKFLOWS:
             filename = f'params-{wf}-wits.json'
-            path = os.path.join(REPO_ROOT, 'params', filename)
+            path = os.path.join(REPO_ROOT, 'params', 'wits', filename)
             with open(path) as fh:
                 try:
                     json.load(fh)
@@ -587,21 +592,21 @@ class TestParamsWitsJson:
 
     # Keep backward-compatible tests targeting the canonical CANOES Wits file.
     def test_params_wits_json_exists(self):
-        """params/params-canoes-wits.json must exist as a Wits cluster template."""
+        """params/wits/params-canoes-wits.json must exist as a Wits cluster template."""
         assert os.path.isfile(PARAMS_CANOES_WITS_JSON), (
-            "params/params-canoes-wits.json must exist as a ready-to-use template for "
+            "params/wits/params-canoes-wits.json must exist as a ready-to-use template for "
             "running the workflow on the ZA-Wits-Core HPC cluster"
         )
 
     def test_params_wits_json_is_valid_json(self):
-        """params/params-canoes-wits.json must be valid JSON."""
+        """params/wits/params-canoes-wits.json must be valid JSON."""
         import json
         with open(PARAMS_CANOES_WITS_JSON) as fh:
             try:
                 json.load(fh)
             except json.JSONDecodeError as exc:
                 raise AssertionError(
-                    f"params/params-canoes-wits.json is not valid JSON: {exc}"
+                    f"params/wits/params-canoes-wits.json is not valid JSON: {exc}"
                 )
 
     def test_params_wits_json_has_bind_paths(self):
@@ -713,7 +718,12 @@ class TestRegionalWitsExampleParams:
 
     def _read_json(self, filename):
         import json
-        path = os.path.join(REPO_ROOT, 'params', filename)
+        if filename.endswith('-wits-ddd-africa.json'):
+            path = os.path.join(REPO_ROOT, 'params', 'ddd-africa', filename)
+        elif filename.endswith('-wits-ddd-uk.json'):
+            path = os.path.join(REPO_ROOT, 'params', 'ddd-uk', filename)
+        else:
+            path = os.path.join(REPO_ROOT, 'params', 'wits', filename)
         with open(path) as fh:
             return json.load(fh)
 
@@ -722,7 +732,7 @@ class TestRegionalWitsExampleParams:
         for wf in WITS_WORKFLOWS:
             for region in ("ddd-africa", "ddd-uk"):
                 filename = f'params-{wf}-wits-{region}.json'
-                path = os.path.join(REPO_ROOT, 'params', filename)
+                path = os.path.join(REPO_ROOT, 'params', region, filename)
                 assert os.path.isfile(path), (
                     f"{filename} must exist as a region-specific example params file"
                 )

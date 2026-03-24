@@ -14,7 +14,7 @@ Covers:
      from filenames to recover the bare sample ID.
   5. RUN_SURVIVOR and RUN_TRUVARI filter samples that have fewer than 2 VCFs
      (so only samples covered by ≥2 callers enter consensus steps).
-  6. All params JSON files exist in params/ and contain valid JSON with the
+  6. All general params JSON files exist in params/general/ and contain valid JSON with the
      correct "workflow" key.
   7. Each params JSON references a workflow name that matches one of the cases.
   8. survivor_with_features and truvari_with_features end-to-end workflows
@@ -93,7 +93,7 @@ def _read_main():
 
 
 def _load_params(filename):
-    path = os.path.join(PARAMS_DIR, filename)
+    path = os.path.join(PARAMS_DIR, "general", filename)
     with open(path) as fh:
         return json.load(fh)
 
@@ -605,7 +605,7 @@ class TestParamsJsonFiles:
     @pytest.mark.parametrize("workflow_name,filename", PARAMS_FILES.items())
     def test_params_file_exists(self, workflow_name, filename):
         """Each workflow must have a corresponding params JSON file in params/."""
-        path = os.path.join(PARAMS_DIR, filename)
+        path = os.path.join(PARAMS_DIR, "general", filename)
         assert os.path.isfile(path), (
             f"params/{filename} must exist for the {workflow_name} workflow"
         )
@@ -613,7 +613,7 @@ class TestParamsJsonFiles:
     @pytest.mark.parametrize("workflow_name,filename", PARAMS_FILES.items())
     def test_params_file_is_valid_json(self, workflow_name, filename):
         """Each params file must be valid JSON (parseable without errors)."""
-        path = os.path.join(PARAMS_DIR, filename)
+        path = os.path.join(PARAMS_DIR, "general", filename)
         if not os.path.isfile(path):
             pytest.skip(f"{filename} does not exist")
         try:
@@ -629,7 +629,7 @@ class TestParamsJsonFiles:
     @pytest.mark.parametrize("workflow_name,filename", PARAMS_FILES.items())
     def test_params_file_has_workflow_key(self, workflow_name, filename):
         """Each params file must contain a 'workflow' key."""
-        path = os.path.join(PARAMS_DIR, filename)
+        path = os.path.join(PARAMS_DIR, "general", filename)
         if not os.path.isfile(path):
             pytest.skip(f"{filename} does not exist")
         data = _load_params(filename)
@@ -641,7 +641,7 @@ class TestParamsJsonFiles:
     @pytest.mark.parametrize("workflow_name,filename", PARAMS_FILES.items())
     def test_params_file_workflow_value_is_correct(self, workflow_name, filename):
         """The 'workflow' value in each params file must match the expected workflow name."""
-        path = os.path.join(PARAMS_DIR, filename)
+        path = os.path.join(PARAMS_DIR, "general", filename)
         if not os.path.isfile(path):
             pytest.skip(f"{filename} does not exist")
         data = _load_params(filename)
@@ -662,7 +662,7 @@ class TestParamsJsonFiles:
         'outdir' for module-published outputs and 'localDownloadPath' as the ICA
         download staging path.
         """
-        path = os.path.join(PARAMS_DIR, filename)
+        path = os.path.join(PARAMS_DIR, "general", filename)
         if not os.path.isfile(path):
             pytest.skip(f"{filename} does not exist")
         data = _load_params(filename)
@@ -680,7 +680,7 @@ class TestParamsJsonFiles:
     ])
     def test_consensus_params_have_caller_dirs(self, filename):
         """Consensus params files must specify at least two caller dirs."""
-        path = os.path.join(PARAMS_DIR, filename)
+        path = os.path.join(PARAMS_DIR, "general", filename)
         if not os.path.isfile(path):
             pytest.skip(f"{filename} does not exist")
         data = _load_params(filename)
@@ -701,7 +701,7 @@ class TestParamsJsonFiles:
     ])
     def test_combined_params_have_merger_mode(self, filename):
         """Combined workflow params files must include a merger_mode key."""
-        path = os.path.join(PARAMS_DIR, filename)
+        path = os.path.join(PARAMS_DIR, "general", filename)
         if not os.path.isfile(path):
             pytest.skip(f"{filename} does not exist")
         data = _load_params(filename)

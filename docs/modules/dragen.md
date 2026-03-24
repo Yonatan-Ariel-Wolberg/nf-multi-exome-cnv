@@ -45,4 +45,4 @@ All DRAGEN analysis outputs are downloaded to `${outdir}/out_DRAGEN`.
 - `truth_bed`, `probes_bed` (only when running automatic evaluation in `main.nf`)
 
 ## Params template
-- `params/params-icav2-dragen.json`
+- `params/general/params-icav2-dragen.json`

@@ -14,6 +14,12 @@ def _load_workflow():
     return yaml.safe_load(CODEQL_WORKFLOW.read_text(encoding="utf-8"))
 
 
+def _find_step_by_name(steps, step_name):
+    step = next((item for item in steps if item.get("name") == step_name), None)
+    assert step is not None, f"Expected workflow step not found: {step_name}"
+    return step
+
+
 def test_codeql_matrix_covers_python_and_c():
     workflow = _load_workflow()
     matrix_entries = workflow["jobs"]["analyze"]["strategy"]["matrix"]["include"]
@@ -31,11 +37,13 @@ def test_codeql_has_script_analysis_job_for_nextflow_r_shell():
     assert "Analyze R scripts" in step_names
     assert "Analyze Nextflow scripts" in step_names
 
-    shell_step = next((step for step in steps if step.get("name") == "Analyze Shell scripts"), None)
-    assert shell_step is not None
+    install_shellcheck_step = _find_step_by_name(steps, "Install ShellCheck")
+    assert "apt-get update" in install_shellcheck_step["run"]
+    assert "apt-get install -y shellcheck" in install_shellcheck_step["run"]
+
+    shell_step = _find_step_by_name(steps, "Analyze Shell scripts")
     assert "shellcheck" in shell_step["run"]
 
-    r_step = next((step for step in steps if step.get("name") == "Analyze R scripts"), None)
-    assert r_step is not None
+    r_step = _find_step_by_name(steps, "Analyze R scripts")
     assert "Rscript -e" in r_step["run"]
     assert "parse(file = commandArgs(trailingOnly = TRUE)[1])" in r_step["run"]

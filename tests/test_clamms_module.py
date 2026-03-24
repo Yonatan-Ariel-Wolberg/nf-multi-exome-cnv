@@ -646,6 +646,20 @@ class TestReadmeClammsSexinfoDocumentation:
             "'F' (female) as valid sex values."
         )
 
+    def test_readme_sexinfo_documents_non_exact_id_match_requirement(self, readme_text):
+        section = _extract_doc_section(readme_text, 'Sexinfo file requirements')
+        assert section is not None
+        assert 'does not need to contain exactly' in section and 'set of IDs' in section, (
+            "Sexinfo requirements must clarify that sexinfo does not need to be an "
+            "exact ID-set match to samplesheet.tsv."
+        )
+        assert 'extra IDs are ignored' in section and re.search(
+            r'must\s+include\s+all sample IDs', section
+        ), (
+            "Sexinfo requirements must clarify that extra IDs are ignored but all "
+            "samplesheet IDs are required."
+        )
+
 
 class TestClammsDocSexinfoDocumentation:
     """docs/modules/clamms.md should document the required sexinfo file format."""
@@ -677,3 +691,16 @@ class TestClammsDocSexinfoDocumentation:
             "'F' (female) as valid sex values."
         )
 
+    def test_clamms_doc_sexinfo_documents_non_exact_id_match_requirement(self, doc_text):
+        section = _extract_doc_section(doc_text, 'Sexinfo file requirements')
+        assert section is not None
+        assert 'does not need to contain exactly' in section and 'set of IDs' in section, (
+            "clamms.md sexinfo section must clarify that sexinfo does not need to "
+            "be an exact ID-set match to samplesheet.tsv."
+        )
+        assert 'extra IDs are ignored' in section and re.search(
+            r'must\s+include\s+all sample IDs', section
+        ), (
+            "clamms.md sexinfo section must clarify that extra IDs are ignored but "
+            "all samplesheet IDs are required."
+        )

@@ -35,7 +35,7 @@ CLAMMS uses depth-of-coverage and cohort-derived nearest-neighbour normalisation
 
 The `sexinfo` file must be a headerless, tab-separated file with exactly two columns:
 
-- Column 1: `sample_id` – must match the sample identifiers used in the samplesheet.
+- Column 1: `sample_id` – used to look up sex for each sample in the samplesheet.
 - Column 2: `sex` – biological sex of the sample; must be `M` (male) or `F` (female).
 
 Example:
@@ -46,8 +46,10 @@ SAMPLE002	F
 SAMPLE003	M
 ```
 
-Every sample in the cohort must have an entry in this file.  CLAMMS will abort
-with an error if a sample ID is not found.
+Every sample in the cohort must have an entry in this file. CLAMMS will abort with
+an error if a sample ID is not found. The file does not need to contain exactly
+the same set of IDs as `samplesheet.tsv` (extra IDs are ignored), but it must
+include all sample IDs present in the samplesheet.
 
 ## Commonly used optional parameters
 - `truth_bed`, `probes_bed` (only when running automatic evaluation in `main.nf`)

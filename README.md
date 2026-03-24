@@ -229,7 +229,7 @@ Example:
 
 For `--workflow clamms`, the `sexinfo` input file must be a headerless, tab-separated file with exactly two columns:
 
-- Column 1: `sample_id` – must match the sample identifiers used in the samplesheet.
+- Column 1: `sample_id` – used to look up sex for each sample in the samplesheet.
 - Column 2: `sex` – biological sex of the sample; must be `M` (male) or `F` (female).
 
 Example:
@@ -240,7 +240,10 @@ SAMPLE002	F
 SAMPLE003	M
 ```
 
-Every sample in the cohort must have an entry in this file; CLAMMS will abort with an error if a sample ID is missing.
+Every sample in the cohort must have an entry in this file; CLAMMS will abort with
+an error if a sample ID is missing. The file does not need to contain exactly the
+same set of IDs as `samplesheet.tsv` (extra IDs are ignored), but it must include
+all sample IDs present in the samplesheet.
 
 ## Running on the Wits UI Cluster
 

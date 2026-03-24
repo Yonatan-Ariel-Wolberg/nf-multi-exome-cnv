@@ -18,6 +18,7 @@ def test_readme_documents_validation_gaps():
         "`--workflow feature_extraction`",
         "`--workflow train`",
         "Any workflow: some workflow-specific secondary assets may exist but still be",
+        "unreadable or invalid in ways not fully pre-validated.",
     ]
     for item in expected_items:
         assert item in text, f"README missing unhandled use-case error bullet: {item}"

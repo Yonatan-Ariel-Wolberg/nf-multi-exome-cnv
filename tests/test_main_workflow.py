@@ -225,7 +225,8 @@ class TestRuntimeInputValidation:
         assert "def validate_full_reference_assets_consistency()" in main_text
         assert "def validate_icav2_runtime_assets()" in main_text
         assert "def validate_vcf_schema_preconditions()" in main_text
-        assert "def validate_io_permissions_and_disk(def output_dir_path, Integer min_free_gb = 5)" in main_text
+        assert "def validate_io_permissions_and_disk(def output_dir_path" in main_text
+        assert "Integer min_free_gb = DEFAULT_MIN_FREE_GB" in main_text
 
     def test_runtime_validation_error_contracts_present(self, main_text):
         assert "Error: malformed truth_labels" in main_text

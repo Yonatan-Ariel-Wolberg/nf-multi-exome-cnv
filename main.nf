@@ -36,6 +36,9 @@ def CALLER_DIR_PARAMS = [
 // Valid caller names accepted by normalise_cnv_caller_quality_scores.py.
 // Note: GATK gCNV is referred to as 'GATK' (not 'GCNV') by the normalise script.
 def VALID_NORMALISE_CALLERS = ['CANOES', 'CLAMMS', 'XHMM', 'GATK', 'CNVKIT', 'DRAGEN', 'INDELIBLE']
+def BYTES_PER_GIB = 1024D * 1024D * 1024D
+def DEFAULT_MIN_FREE_GB = 5
+def MAX_VCF_SCHEMA_VALIDATION_FILES = 5
 
 def REQUIRED_PARAMS_BY_WORKFLOW = [
     // Required params are aligned to the workflow-specific params/*.json templates.
@@ -309,10 +312,10 @@ def validate_samplesheet_and_bam_indices(def samplesheet_path) {
         def index_candidates = []
         if (bam_path.name.toLowerCase().endsWith('.bam')) {
             index_candidates << new File(bam_path.toString() + '.bai')
-            index_candidates << new File(bam_path.parentFile, bam_path.name.replaceAll(/\.bam$/i, '.bai'))
+            index_candidates << new File(bam_path.parentFile, bam_path.name.replaceAll(/(?i)\.bam$/, '.bai'))
         } else if (bam_path.name.toLowerCase().endsWith('.cram')) {
             index_candidates << new File(bam_path.toString() + '.crai')
-            index_candidates << new File(bam_path.parentFile, bam_path.name.replaceAll(/\.cram$/i, '.crai'))
+            index_candidates << new File(bam_path.parentFile, bam_path.name.replaceAll(/(?i)\.cram$/, '.crai'))
         }
         if (!index_candidates.isEmpty()) {
             def has_readable_index = index_candidates.any { it.exists() && it.isFile() && it.canRead() }
@@ -363,7 +366,14 @@ def validate_icav2_runtime_assets() {
 
 def open_maybe_gzip_reader(File f) {
     if (f.name.toLowerCase().endsWith('.gz')) {
-        return new BufferedReader(new InputStreamReader(new java.util.zip.GZIPInputStream(new FileInputStream(f))))
+        FileInputStream fis = new FileInputStream(f)
+        try {
+            def gis = new java.util.zip.GZIPInputStream(fis)
+            return new BufferedReader(new InputStreamReader(gis))
+        } catch (Throwable t) {
+            fis.close()
+            throw t
+        }
     }
     return new BufferedReader(new FileReader(f))
 }
@@ -405,7 +415,7 @@ def validate_vcf_schema_preconditions() {
         def vcfs = vcf_dir.listFiles()?.findAll {
             it.isFile() && (it.name.toLowerCase().endsWith('.vcf') || it.name.toLowerCase().endsWith('.vcf.gz'))
         } ?: []
-        vcfs.take(5).each { vcf_file ->
+        vcfs.take(MAX_VCF_SCHEMA_VALIDATION_FILES).each { vcf_file ->
             validate_single_vcf_schema(vcf_file, "--workflow ${workflow_mode} --vcf_dir")
         }
     }
@@ -418,16 +428,16 @@ def validate_vcf_schema_preconditions() {
             it.name.contains(suffix) &&
             (it.name.toLowerCase().endsWith('.vcf') || it.name.toLowerCase().endsWith('.vcf.gz'))
         } ?: []
-        merged_vcfs.take(5).each { vcf_file ->
+        merged_vcfs.take(MAX_VCF_SCHEMA_VALIDATION_FILES).each { vcf_file ->
             validate_single_vcf_schema(vcf_file, "--workflow ${workflow_mode} --merged_vcf_dir")
         }
     }
 }
 
-def validate_io_permissions_and_disk(def output_dir_path, Integer min_free_gb = 5) {
+def validate_io_permissions_and_disk(def output_dir_path, Integer min_free_gb = DEFAULT_MIN_FREE_GB) {
     if (output_dir_path) {
         def output_dir = require_writable_dir(output_dir_path, 'outdir')
-        def free_gb = (output_dir.usableSpace / (1024D * 1024D * 1024D))
+        def free_gb = (output_dir.usableSpace / BYTES_PER_GIB)
         if (free_gb < min_free_gb) {
             fail_validation("Error: insufficient disk space in output path '${output_dir_path}'. Required at least ${min_free_gb} GB, found ${String.format('%.2f', free_gb)} GB.")
         }

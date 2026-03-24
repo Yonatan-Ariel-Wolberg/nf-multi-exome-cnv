@@ -114,8 +114,13 @@ jobs:
     - name: Analyze Shell scripts
       shell: bash
       run: |
-        if find . -type f -name '*.sh' -print -quit | grep -q .; then
-          find . -type f -name '*.sh' -print0 | xargs -0 shellcheck
+        if find . -type f -name '*.sh' -print -quit | grep -q . || { [ -d bin ] && find bin -type f -perm -u+x -print -quit | grep -q .; }; then
+          {
+            find . -type f -name '*.sh' -print0
+            if [ -d bin ]; then
+              find bin -type f -perm -u+x -print0
+            fi
+          } | xargs -0 shellcheck
         else
           echo "No shell scripts found."
         fi

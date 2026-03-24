@@ -44,5 +44,9 @@ All DRAGEN analysis outputs are downloaded to `${outdir}/out_DRAGEN`.
 - `analysisStatusCheckLimit`
 - `truth_bed`, `probes_bed` (only when running automatic evaluation in `main.nf`)
 
+## Container
+- A Docker recipe for the ICAv2 CLI runtime is provided at `bin/Dockerfile.icav2`.
+- An equivalent Apptainer recipe is provided at `bin/icav2.def`.
+
 ## Params template
 - `params/general/params-icav2-dragen.json`

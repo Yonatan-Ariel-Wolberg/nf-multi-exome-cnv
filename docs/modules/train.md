@@ -9,6 +9,7 @@ This module trains an XGBoost classifier from feature matrices and truth labels,
 ## Container
 - `withLabel: 'train'` uses `docker://quay.io/condaforge/mambaforge:24.9.2-0`.
 - `xgboost=2.1.4`, `scikit-learn=1.6.1`, `imbalanced-learn=0.13.0`, `pandas=2.2.3`, and `numpy=2.2.3` are installed at runtime in `TRAIN_XGBOOST`.
+- A Docker recipe for prebuilding these pinned dependencies is provided at `bin/Dockerfile.train`.
 - An equivalent Apptainer recipe for these pinned dependencies is provided at `bin/train.def`.
 - `quay.io/biocontainers/xgboost:0.6a2--py27_0` is not supported by this module (Python 2.7 / legacy XGBoost API).
 

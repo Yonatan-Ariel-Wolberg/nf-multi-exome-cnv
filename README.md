@@ -117,9 +117,21 @@ git clone https://github.com/Yonatan-Ariel-Wolberg/nf-multicaller-exomecnv.git
 cd nf-multicaller-exomecnv
 ```
 
-2. Build the icav2_cli_v2.43.0.sif
+2. Build the ICAv2 container image (Docker or Apptainer)
 ```bash
-apptainer build icav2_cli_v2.43.0.sif icav2.def
+# Docker build (from the new Dockerfile)
+docker build -f bin/Dockerfile.icav2 -t nf-multicaller-exomecnv/icav2-cli:2.43.0 .
+
+# Optional: build Apptainer/Singularity image from the existing recipe
+apptainer build icav2_cli_v2.43.0.sif bin/icav2.def
+```
+
+3. (Optional) Build the training container image
+```bash
+docker build -f bin/Dockerfile.train -t nf-multicaller-exomecnv/train:2.1.4 .
+
+# Optional: build Apptainer/Singularity image from the existing recipe
+apptainer build train_xgboost_deps.sif bin/train.def
 ```
 
 ## Usage
@@ -349,7 +361,9 @@ The DRAGEN workflow submits runs to the ICAv2 cloud platform from a local contai
 
 1. Build the ICAv2 CLI container (if not already done):
    ```bash
-   apptainer build icav2_cli_v2.43.0.sif icav2.def
+   docker build -f bin/Dockerfile.icav2 -t nf-multicaller-exomecnv/icav2-cli:2.43.0 .
+   # or:
+   apptainer build icav2_cli_v2.43.0.sif bin/icav2.def
    ```
 2. Update the container path in `nextflow.config` (`withLabel: 'icav2-dragen'`) to the location where you stored the `.sif` file.
 3. Ensure your ICA credentials are present at `~/.icav2/` on the cluster head node so they can be bind-mounted into the container.

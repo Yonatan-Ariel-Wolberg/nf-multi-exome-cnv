@@ -88,6 +88,22 @@ methodology/process documentation is now split into module-specific pages.
 ### Libraries and Dependencies
 All bioinformatics tools (CANOES, CLAMMS, XHMM, GATK, CNVkit, InDelible, ICAv2 CLI, SURVIVOR, Truvari, bcftools, bedtools, Picard) are provided as pre-built container images and are downloaded automatically by Apptainer at runtime. No manual tool installation is required beyond Apptainer and Nextflow themselves.
 
+### Python dependencies for tests
+The pipeline itself runs in containers, but the local Python test suite (`tests/*.py`) requires these Python packages in a fresh environment:
+
+- `pytest`
+- `numpy`
+- `pandas`
+- `scikit-learn`
+- `xgboost`
+- `imbalanced-learn`
+- `pysam`
+
+Install them with:
+```bash
+python -m pip install pytest numpy pandas scikit-learn xgboost imbalanced-learn pysam
+```
+
 ### Computing Resources
 - Adequate CPU cores (parallel execution recommended)
 - Sufficient disk space for intermediate and output files

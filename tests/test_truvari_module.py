@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for the Truvari Nextflow module (modules/modules-truvari.nf).
+Tests for the Truvari Nextflow module (modules/sv-mergers/modules-truvari.nf).
 
 Validates that the module correctly implements a two-step VCF consensus
 pipeline for exome CNV callers:
@@ -29,7 +29,7 @@ import re
 import pytest
 
 
-NF_MODULE = "modules/modules-truvari.nf"
+NF_MODULE = "modules/sv-mergers/modules-truvari.nf"
 
 
 # ---------------------------------------------------------------------------

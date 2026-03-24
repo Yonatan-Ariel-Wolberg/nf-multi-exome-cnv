@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for the CLAMMS Nextflow module (modules/modules-clamms.nf).
+Tests for the CLAMMS Nextflow module (modules/callers/modules-clamms.nf).
 
 Validates that the module correctly implements the CLAMMS pipeline for exome
 sequencing CNV calling from a cohort (no matched normals), producing per-sample
@@ -34,7 +34,7 @@ import re
 import pytest
 
 
-NF_MODULE = "modules/modules-clamms.nf"
+NF_MODULE = "modules/callers/modules-clamms.nf"
 REPO_ROOT = os.path.join(os.path.dirname(__file__), "..")
 
 

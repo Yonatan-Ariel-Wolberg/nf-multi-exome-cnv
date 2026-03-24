@@ -8,7 +8,7 @@ Validates:
   2. bin/evaluate_caller_performance.py accepts the new 5-column BED format
      (CHR, START, STOP, CNV_TYPE, SAMPLE_ID) for both truth and call sets and
      correctly computes precision / sensitivity metrics.
-  3. modules/modules-evaluate.nf declares the VCF_TO_BED, COMBINE_BEDS, and
+  3. modules/evaluate/modules-evaluate.nf declares the VCF_TO_BED, COMBINE_BEDS, and
      EVALUATE_CALLER processes together with an EVALUATE workflow that chains them.
   4. main.nf includes the EVALUATE workflow, defines the RUN_EVALUATE sub-workflow,
      integrates optional evaluation after each of the 7 callers, and exposes the
@@ -26,7 +26,7 @@ REPO_ROOT = os.path.join(os.path.dirname(__file__), '..')
 BIN_DIR   = os.path.join(REPO_ROOT, 'bin')
 sys.path.insert(0, os.path.abspath(BIN_DIR))
 
-NF_EVALUATE = os.path.join(REPO_ROOT, 'modules', 'modules-evaluate.nf')
+NF_EVALUATE = os.path.join(REPO_ROOT, 'modules', 'evaluate', 'modules-evaluate.nf')
 NF_MAIN     = os.path.join(REPO_ROOT, 'main.nf')
 
 
@@ -359,7 +359,7 @@ class TestEvaluateCallerPerformance:
 
 
 # ---------------------------------------------------------------------------
-# modules/modules-evaluate.nf – structural tests
+# modules/evaluate/modules-evaluate.nf – structural tests
 # ---------------------------------------------------------------------------
 
 class TestEvaluateModule:
@@ -442,7 +442,7 @@ class TestMainNfIntegration:
     """Verify main.nf includes EVALUATE and integrates it correctly."""
 
     def test_includes_evaluate_workflow(self, main_nf):
-        assert "include { EVALUATE } from './modules/modules-evaluate.nf'" in main_nf
+        assert "include { EVALUATE } from './modules/evaluate/modules-evaluate.nf'" in main_nf
 
     def test_defines_run_evaluate_sub_workflow(self, main_nf):
         assert 'workflow RUN_EVALUATE' in main_nf

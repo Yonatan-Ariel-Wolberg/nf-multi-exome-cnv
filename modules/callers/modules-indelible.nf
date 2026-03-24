@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-include { NORMALISE_CNV_QUALITY_SCORES } from './modules-common.nf'
+include { NORMALISE_CNV_QUALITY_SCORES } from '../common/modules-common.nf'
 
 // =============================================================================
 // INDELIBLE MODULE

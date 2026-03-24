@@ -4,19 +4,19 @@ nextflow.enable.dsl=2
 // =====================================================================================
 // MODULE INCLUDES
 // =====================================================================================
-include { INDELIBLE } from './modules/modules-indelible.nf'
-include { CANOES } from './modules/modules-canoes.nf'
-include { XHMM } from './modules/modules-xhmm.nf'
-include { CLAMMS } from './modules/modules-clamms.nf'
-include { DRAGEN } from './modules/modules-icav2-dragen.nf'
-include { CNVKIT } from './modules/modules-cnvkit.nf'
-include { GATK_GCNV } from './modules/modules-gatk-gcnv.nf'
-include { SURVIVOR } from './modules/modules-survivor.nf'
-include { TRUVARI } from './modules/modules-truvari.nf'
-include { FEATURE_EXTRACTION } from './modules/modules-feature-extraction.nf'
-include { NORMALISE } from './modules/modules-normalise.nf'
-include { TRAIN } from './modules/modules-train.nf'
-include { EVALUATE } from './modules/modules-evaluate.nf'
+include { INDELIBLE } from './modules/callers/modules-indelible.nf'
+include { CANOES } from './modules/callers/modules-canoes.nf'
+include { XHMM } from './modules/callers/modules-xhmm.nf'
+include { CLAMMS } from './modules/callers/modules-clamms.nf'
+include { DRAGEN } from './modules/callers/modules-icav2-dragen.nf'
+include { CNVKIT } from './modules/callers/modules-cnvkit.nf'
+include { GATK_GCNV } from './modules/callers/modules-gatk-gcnv.nf'
+include { SURVIVOR } from './modules/sv-mergers/modules-survivor.nf'
+include { TRUVARI } from './modules/sv-mergers/modules-truvari.nf'
+include { FEATURE_EXTRACTION } from './modules/ml/modules-feature-extraction.nf'
+include { NORMALISE } from './modules/normalise/modules-normalise.nf'
+include { TRAIN } from './modules/ml/modules-train.nf'
+include { EVALUATE } from './modules/evaluate/modules-evaluate.nf'
 
 // =====================================================================================
 // GLOBAL SETUP

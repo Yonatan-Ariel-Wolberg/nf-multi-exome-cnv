@@ -17,7 +17,7 @@ import re
 import pytest
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-DRAGEN_MODULE = os.path.join(REPO_ROOT, 'modules', 'modules-icav2-dragen.nf')
+DRAGEN_MODULE = os.path.join(REPO_ROOT, 'modules', 'callers', 'modules-icav2-dragen.nf')
 MAIN_NF = os.path.join(REPO_ROOT, 'main.nf')
 
 

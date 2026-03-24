@@ -27,4 +27,4 @@ CNVkit performs target/antitarget coverage analysis, pooled-reference normalisat
 - `truth_bed`, `probes_bed` (only when running automatic evaluation in `main.nf`)
 
 ## Params template
-- `params/params-cnvkit.json`
+- `params/general/params-cnvkit.json`

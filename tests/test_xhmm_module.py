@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for the XHMM Nextflow module (modules/modules-xhmm.nf).
+Tests for the XHMM Nextflow module (modules/callers/modules-xhmm.nf).
 
 Validates that the module correctly implements the XHMM CNV-calling pipeline
 for exome sequencing from a cohort, producing per-sample VCF files that:
@@ -17,7 +17,7 @@ import re
 
 import pytest
 
-NF_MODULE = "modules/modules-xhmm.nf"
+NF_MODULE = "modules/callers/modules-xhmm.nf"
 
 
 # ---------------------------------------------------------------------------

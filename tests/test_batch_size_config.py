@@ -22,11 +22,11 @@ import json
 # Repository root relative to this test file
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
-CANOES_MODULE   = os.path.join(REPO_ROOT, 'modules', 'modules-canoes.nf')
-XHMM_MODULE     = os.path.join(REPO_ROOT, 'modules', 'modules-xhmm.nf')
+CANOES_MODULE   = os.path.join(REPO_ROOT, 'modules', 'callers', 'modules-canoes.nf')
+XHMM_MODULE     = os.path.join(REPO_ROOT, 'modules', 'callers', 'modules-xhmm.nf')
 NEXTFLOW_CONFIG = os.path.join(REPO_ROOT, 'nextflow.config')
-PARAMS_CANOES   = os.path.join(REPO_ROOT, 'params', 'params-canoes.json')
-PARAMS_XHMM     = os.path.join(REPO_ROOT, 'params', 'params-xhmm.json')
+PARAMS_CANOES   = os.path.join(REPO_ROOT, 'params', 'general', 'params-canoes.json')
+PARAMS_XHMM     = os.path.join(REPO_ROOT, 'params', 'general', 'params-xhmm.json')
 XHMM_CONF       = os.path.join(REPO_ROOT, 'params', 'xhmm.conf')
 
 

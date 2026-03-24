@@ -17,4 +17,4 @@ This module evaluates CNV calls against a truth BED set by converting per-sample
 - `probes_bed`
 
 ## Params template
-- `params/params-evaluate.json`
+- `params/general/params-evaluate.json`

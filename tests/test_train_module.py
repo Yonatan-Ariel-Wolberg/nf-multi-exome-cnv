@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for modules/modules-train.nf and its integration into main.nf.
+Tests for modules/ml/modules-train.nf and its integration into main.nf.
 
 Validates:
   1. modules-train.nf exists and has the correct DSL2 / process / workflow structure.
@@ -9,7 +9,7 @@ Validates:
   4. main.nf includes the TRAIN module, defines RUN_TRAIN, and has a
      case['train'] block that reads --features_dir and --truth_labels params.
   5. nextflow.config defines a 'train' process label.
-  6. params/params-train.json exists and contains valid JSON with the correct keys.
+  6. params/general/params-train.json exists and contains valid JSON with the correct keys.
   7. bin/train_xgboost.py exposes a main() function and uses argparse.
 """
 
@@ -20,10 +20,10 @@ import re
 import pytest
 
 REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-NF_PATH     = os.path.join(REPO_ROOT, 'modules', 'modules-train.nf')
+NF_PATH     = os.path.join(REPO_ROOT, 'modules', 'ml', 'modules-train.nf')
 MAIN_NF     = os.path.join(REPO_ROOT, 'main.nf')
 CONFIG_PATH = os.path.join(REPO_ROOT, 'nextflow.config')
-PARAMS_FILE = os.path.join(REPO_ROOT, 'params', 'params-train.json')
+PARAMS_FILE = os.path.join(REPO_ROOT, 'params', 'general', 'params-train.json')
 SCRIPT_PATH = os.path.join(REPO_ROOT, 'bin', 'train_xgboost.py')
 TRAIN_DEF = os.path.join(REPO_ROOT, 'bin', 'train.def')
 
@@ -65,7 +65,7 @@ class TestModuleStructure:
 
     def test_file_exists(self):
         assert os.path.isfile(NF_PATH), (
-            'modules/modules-train.nf must exist'
+            'modules/ml/modules-train.nf must exist'
         )
 
     def test_dsl2_enabled(self, nf_text):
@@ -344,15 +344,15 @@ class TestNextflowConfigIntegration:
 
 
 # ===========================================================================
-# 7. params/params-train.json
+# 7. params/general/params-train.json
 # ===========================================================================
 
 class TestParamsFile:
-    """params/params-train.json must exist and be valid JSON with correct keys."""
+    """params/general/params-train.json must exist and be valid JSON with correct keys."""
 
     def test_params_file_exists(self):
         assert os.path.isfile(PARAMS_FILE), (
-            'params/params-train.json must exist'
+            'params/general/params-train.json must exist'
         )
 
     def test_params_file_valid_json(self):

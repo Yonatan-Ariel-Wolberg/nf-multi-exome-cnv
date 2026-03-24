@@ -116,25 +116,25 @@ The individual callers should be run first. Their VCF outputs feed into the cons
 
 ```bash
 # CANOES — exome CNV caller using read-depth, NNLS reference weighting and Negative Binomial HMM
-nextflow run main.nf --workflow canoes -params-file params/params-canoes.json
+nextflow run main.nf --workflow canoes -params-file params/general/params-canoes.json
 
 # XHMM — exome CNV caller using GATK depth-of-coverage and PCA
-nextflow run main.nf --workflow xhmm -params-file params/params-xhmm.json
+nextflow run main.nf --workflow xhmm -params-file params/general/params-xhmm.json
 
 # CLAMMS — exome CNV caller using nearest-neighbour normalisation
-nextflow run main.nf --workflow clamms -params-file params/params-clamms.json
+nextflow run main.nf --workflow clamms -params-file params/general/params-clamms.json
 
 # GATK-gCNV — cohort-mode germline CNV caller from the Broad Institute
-nextflow run main.nf --workflow gcnv -params-file params/params-gatk-gcnv.json
+nextflow run main.nf --workflow gcnv -params-file params/general/params-gatk-gcnv.json
 
 # CNVkit — coverage-based CNV caller with pooled reference normalisation
-nextflow run main.nf --workflow cnvkit -params-file params/params-cnvkit.json
+nextflow run main.nf --workflow cnvkit -params-file params/general/params-cnvkit.json
 
 # DRAGEN — Illumina DRAGEN germline enrichment pipeline via ICAv2
-nextflow run main.nf --workflow dragen -params-file params/params-icav2-dragen.json
+nextflow run main.nf --workflow dragen -params-file params/general/params-icav2-dragen.json
 
 # InDelible — small insertion/deletion caller from split reads
-nextflow run main.nf --workflow indelible -params-file params/params-indelible.json
+nextflow run main.nf --workflow indelible -params-file params/general/params-indelible.json
 ```
 
 ### Consensus modules (run after individual callers)
@@ -143,10 +143,10 @@ Point the `*_dir` paths in the params file to the VCF output directories produce
 
 ```bash
 # SURVIVOR — merge per-caller VCFs into a consensus call set
-nextflow run main.nf --workflow survivor -params-file params/params-survivor.json
+nextflow run main.nf --workflow survivor -params-file params/general/params-survivor.json
 
 # Truvari — collapse per-caller VCFs into a consensus call set
-nextflow run main.nf --workflow truvari -params-file params/params-truvari.json
+nextflow run main.nf --workflow truvari -params-file params/general/params-truvari.json
 ```
 
 `survivor` / `truvari` only produce the consensus VCF outputs.
@@ -157,12 +157,12 @@ Use `--workflow full` to run available caller modules from BAM/CRAM inputs,
 merge caller outputs, extract features, and train the XGBoost model in one run.
 
 ```bash
-nextflow run main.nf --workflow full -params-file params/params-full.json
+nextflow run main.nf --workflow full -params-file params/general/params-full.json
 ```
 
 Notes:
 - The full workflow automatically uses whichever caller inputs are configured in
-  `params/params-full.json`.
+  `params/general/params-full.json`.
 - At least **two** caller inputs must be configured so consensus merging can run.
 - Set `merger_mode` to `survivor` (default) or `truvari`.
 - `truth_labels` is required for the final `train` step.
@@ -170,8 +170,8 @@ Notes:
 ### Combined consensus + feature extraction workflows
 
 ```bash
-nextflow run main.nf --workflow survivor_with_features -params-file params/params-survivor-with-features.json
-nextflow run main.nf --workflow truvari_with_features -params-file params/params-truvari-with-features.json
+nextflow run main.nf --workflow survivor_with_features -params-file params/general/params-survivor-with-features.json
+nextflow run main.nf --workflow truvari_with_features -params-file params/general/params-truvari-with-features.json
 ```
 
 `*_with_features` workflows run the same consensus merge step as `survivor`/`truvari`,
@@ -183,16 +183,16 @@ All required and optional parameters for each workflow are documented in the cor
 
 | Params file | Workflow |
 |---|---|
-| `params/params-canoes.json` | `--workflow canoes` |
-| `params/params-xhmm.json` | `--workflow xhmm` |
-| `params/params-clamms.json` | `--workflow clamms` |
-| `params/params-gatk-gcnv.json` | `--workflow gcnv` |
-| `params/params-cnvkit.json` | `--workflow cnvkit` |
-| `params/params-icav2-dragen.json` | `--workflow dragen` |
-| `params/params-indelible.json` | `--workflow indelible` |
-| `params/params-survivor.json` | `--workflow survivor` |
-| `params/params-truvari.json` | `--workflow truvari` |
-| `params/params-full.json` | `--workflow full` |
+| `params/general/params-canoes.json` | `--workflow canoes` |
+| `params/general/params-xhmm.json` | `--workflow xhmm` |
+| `params/general/params-clamms.json` | `--workflow clamms` |
+| `params/general/params-gatk-gcnv.json` | `--workflow gcnv` |
+| `params/general/params-cnvkit.json` | `--workflow cnvkit` |
+| `params/general/params-icav2-dragen.json` | `--workflow dragen` |
+| `params/general/params-indelible.json` | `--workflow indelible` |
+| `params/general/params-survivor.json` | `--workflow survivor` |
+| `params/general/params-truvari.json` | `--workflow truvari` |
+| `params/general/params-full.json` | `--workflow full` |
 
 ### Truth-label TSV requirements
 
@@ -241,7 +241,7 @@ module load apptainer   # or: module load singularity (apptainer is already load
 nextflow run main.nf \
     -profile wits,medium \
     --workflow canoes \
-    -params-file params/params-canoes.json
+    -params-file params/general/params-canoes.json
 ```
 
 ### What the `wits` profile does
@@ -281,8 +281,8 @@ Relevant Wits input paths used by the `params/*-wits.json` templates:
 
 Region-specific examples are also provided for every Wits module template:
 
-- DDD-AFRICA examples: `params/params-*-wits-ddd-africa.json`
-- DDD-UK examples: `params/params-*-wits-ddd-uk.json`
+- DDD-AFRICA examples: `params/ddd-africa/params-*-wits-ddd-africa.json`
+- DDD-UK examples: `params/ddd-uk/params-*-wits-ddd-uk.json`
 
 The DDD files in `/home/ywolberg/DECIPHERING_DD_DATA/...` are symbolic links to
 `/dataG/ddd` and `/dataG/ddd-2023`, so both `/dataG` locations must be
@@ -326,13 +326,13 @@ runs.  Combine a cohort-size profile with the site profile using `-profile`:
 
 ```bash
 # ≤ 50 samples
-nextflow run main.nf -profile wits,small  -params-file params/params-canoes.json
+nextflow run main.nf -profile wits,small  -params-file params/general/params-canoes.json
 
 # 50–300 samples (default behaviour if no cohort-size profile is specified)
-nextflow run main.nf -profile wits,medium -params-file params/params-canoes.json
+nextflow run main.nf -profile wits,medium -params-file params/general/params-canoes.json
 
 # 300–2000 samples
-nextflow run main.nf -profile wits,large  -params-file params/params-canoes.json
+nextflow run main.nf -profile wits,large  -params-file params/general/params-canoes.json
 ```
 
 ### What each profile controls
@@ -393,7 +393,7 @@ normalisation regardless of cohort size.
 #### GATK-gCNV (`--workflow gcnv`)
 gCNV trains a cohort-level model and is naturally designed for large cohorts.
 Interval parallelism is controlled by `scatter_count` in
-`params/params-gatk-gcnv.json` (default `5000`).  For the cohort-level steps
+`params/general/params-gatk-gcnv.json` (default `5000`).  For the cohort-level steps
 (`FilterIntervals`, `DetermineGermlineContigPloidy`, `GermlineCNVCaller`) that
 collect all samples at once, increase the memory/CPU limits using the `large`
 profile when running hundreds or thousands of samples.

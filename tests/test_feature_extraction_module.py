@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for modules/modules-feature-extraction.nf.
+Tests for modules/ml/modules-feature-extraction.nf.
 
 Validates the Nextflow module by reading the .nf file as text and asserting on
 process/workflow content via string checks (consistent with the repo's existing
@@ -14,6 +14,7 @@ NF_PATH = os.path.join(
     os.path.dirname(__file__),
     '..',
     'modules',
+    'ml',
     'modules-feature-extraction.nf',
 )
 MAIN_NF = os.path.join(os.path.dirname(__file__), '..', 'main.nf')
@@ -39,7 +40,7 @@ class TestModuleStructure:
 
     def test_file_exists(self):
         assert os.path.isfile(NF_PATH), (
-            "modules/modules-feature-extraction.nf must exist"
+            "modules/ml/modules-feature-extraction.nf must exist"
         )
 
     def test_dsl2_enabled(self, nf_text):

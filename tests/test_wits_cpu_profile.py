@@ -493,7 +493,7 @@ class TestBindPaths:
 
 
 # ===========================================================================
-# 8. params/params-*-wits.json – Wits-specific templates (one per workflow)
+# 8. params/wits/params-*-wits.json – Wits-specific templates (one per workflow)
 # ===========================================================================
 
 WITS_WORKFLOWS = [
@@ -501,7 +501,7 @@ WITS_WORKFLOWS = [
     'icav2-dragen', 'indelible', 'survivor', 'truvari', 'xhmm',
 ]
 
-PARAMS_CANOES_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'params-canoes-wits.json')
+PARAMS_CANOES_WITS_JSON = os.path.join(REPO_ROOT, 'params', 'wits', 'params-canoes-wits.json')
 DDD_AFRICA_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/samplesheet.tsv"
 DDD_AFRICA_TOPLEVEL_SAMPLESHEET = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/samplesheet_africa.tsv"
 DDD_AFRICA_BAM_GLOB = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/**/*.{bam,bam.bai}"
@@ -520,12 +520,20 @@ DDD_UK_SEXINFO = "/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/sex_info.txt"
 WITS_XHMM_CONF = "/dataG/ddd/data/resources/xhmm/params.txt"
 
 
+def _wits_params_path(filename):
+    if filename.endswith('-wits-ddd-africa.json'):
+        return os.path.join(REPO_ROOT, 'params', 'ddd-africa', filename)
+    if filename.endswith('-wits-ddd-uk.json'):
+        return os.path.join(REPO_ROOT, 'params', 'ddd-uk', filename)
+    return os.path.join(REPO_ROOT, 'params', 'wits', filename)
+
+
 class TestParamsWitsJson:
-    """params/params-*-wits.json files must exist for every workflow."""
+    """params/wits/params-*-wits.json files must exist for every workflow."""
 
     def _read_json(self, filename):
         import json
-        path = os.path.join(REPO_ROOT, 'params', filename)
+        path = _wits_params_path(filename)
         with open(path) as fh:
             return json.load(fh)
 
@@ -533,7 +541,7 @@ class TestParamsWitsJson:
         """A params-<workflow>-wits.json file must exist for each workflow."""
         for wf in WITS_WORKFLOWS:
             filename = f'params-{wf}-wits.json'
-            path = os.path.join(REPO_ROOT, 'params', filename)
+            path = os.path.join(REPO_ROOT, 'params', 'wits', filename)
             assert os.path.isfile(path), (
                 f"{filename} must exist as a ready-to-use template for "
                 "running the workflow on the ZA-Wits-Core HPC cluster"
@@ -544,7 +552,7 @@ class TestParamsWitsJson:
         import json
         for wf in WITS_WORKFLOWS:
             filename = f'params-{wf}-wits.json'
-            path = os.path.join(REPO_ROOT, 'params', filename)
+            path = os.path.join(REPO_ROOT, 'params', 'wits', filename)
             with open(path) as fh:
                 try:
                     json.load(fh)
@@ -587,21 +595,21 @@ class TestParamsWitsJson:
 
     # Keep backward-compatible tests targeting the canonical CANOES Wits file.
     def test_params_wits_json_exists(self):
-        """params/params-canoes-wits.json must exist as a Wits cluster template."""
+        """params/wits/params-canoes-wits.json must exist as a Wits cluster template."""
         assert os.path.isfile(PARAMS_CANOES_WITS_JSON), (
-            "params/params-canoes-wits.json must exist as a ready-to-use template for "
+            "params/wits/params-canoes-wits.json must exist as a ready-to-use template for "
             "running the workflow on the ZA-Wits-Core HPC cluster"
         )
 
     def test_params_wits_json_is_valid_json(self):
-        """params/params-canoes-wits.json must be valid JSON."""
+        """params/wits/params-canoes-wits.json must be valid JSON."""
         import json
         with open(PARAMS_CANOES_WITS_JSON) as fh:
             try:
                 json.load(fh)
             except json.JSONDecodeError as exc:
                 raise AssertionError(
-                    f"params/params-canoes-wits.json is not valid JSON: {exc}"
+                    f"params/wits/params-canoes-wits.json is not valid JSON: {exc}"
                 )
 
     def test_params_wits_json_has_bind_paths(self):
@@ -713,7 +721,7 @@ class TestRegionalWitsExampleParams:
 
     def _read_json(self, filename):
         import json
-        path = os.path.join(REPO_ROOT, 'params', filename)
+        path = _wits_params_path(filename)
         with open(path) as fh:
             return json.load(fh)
 
@@ -722,7 +730,7 @@ class TestRegionalWitsExampleParams:
         for wf in WITS_WORKFLOWS:
             for region in ("ddd-africa", "ddd-uk"):
                 filename = f'params-{wf}-wits-{region}.json'
-                path = os.path.join(REPO_ROOT, 'params', filename)
+                path = os.path.join(REPO_ROOT, 'params', region, filename)
                 assert os.path.isfile(path), (
                     f"{filename} must exist as a region-specific example params file"
                 )
@@ -751,3 +759,33 @@ class TestRegionalWitsExampleParams:
         assert "DDD_UK_DATA/bams" in upload_glob
         assert "DDD_UK_DATA/crams" in upload_glob
         assert "DDD_AFRICA_DATA" not in upload_glob
+
+
+class TestParamsDirectoryLayout:
+    """Required params subdirectories for regional/general template organization."""
+
+    def test_required_params_subdirectories_exist(self):
+        """params must include ddd-africa, ddd-uk, wits, and general directories."""
+        params_root = os.path.join(REPO_ROOT, 'params')
+        for dirname in ('ddd-africa', 'ddd-uk', 'wits', 'general'):
+            path = os.path.join(params_root, dirname)
+            assert os.path.isdir(path), (
+                f"params/{dirname} must exist"
+            )
+
+    def test_every_general_params_json_has_variants_in_all_target_subdirectories(self):
+        """Every params/general/params*.json file must exist in wits/ddd-africa/ddd-uk."""
+        params_root = os.path.join(REPO_ROOT, 'params')
+        general_dir = os.path.join(params_root, 'general')
+        general_files = sorted(
+            f for f in os.listdir(general_dir)
+            if f.startswith('params') and f.endswith('.json')
+        )
+        assert general_files, "params/general must contain params*.json templates"
+        for filename in general_files:
+            for target in ('wits', 'ddd-africa', 'ddd-uk'):
+                target_path = os.path.join(params_root, target, filename)
+                assert os.path.isfile(target_path), (
+                    f"params/{target}/{filename} must exist because "
+                    f"params/general/{filename} exists"
+                )

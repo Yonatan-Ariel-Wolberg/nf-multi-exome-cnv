@@ -25,13 +25,13 @@ REPO_ROOT = os.path.join(os.path.dirname(__file__), '..')
 SCRIPT_PATH = os.path.join(BIN_DIR, 'normalise_cnv_caller_quality_scores.py')
 
 MODULES = {
-    'CANOES':   'modules/modules-canoes.nf',
-    'CLAMMS':   'modules/modules-clamms.nf',
-    'XHMM':     'modules/modules-xhmm.nf',
-    'INDELIBLE':'modules/modules-indelible.nf',
-    'GATK':     'modules/modules-gatk-gcnv.nf',
-    'CNVKIT':   'modules/modules-cnvkit.nf',
-    'DRAGEN':   'modules/modules-icav2-dragen.nf',
+    'CANOES':   'modules/callers/modules-canoes.nf',
+    'CLAMMS':   'modules/callers/modules-clamms.nf',
+    'XHMM':     'modules/callers/modules-xhmm.nf',
+    'INDELIBLE':'modules/callers/modules-indelible.nf',
+    'GATK':     'modules/callers/modules-gatk-gcnv.nf',
+    'CNVKIT':   'modules/callers/modules-cnvkit.nf',
+    'DRAGEN':   'modules/callers/modules-icav2-dragen.nf',
 }
 
 
@@ -87,37 +87,37 @@ def script_text():
 
 @pytest.fixture(scope='module')
 def canoes_text():
-    return _read_file('modules/modules-canoes.nf')
+    return _read_file('modules/callers/modules-canoes.nf')
 
 
 @pytest.fixture(scope='module')
 def clamms_text():
-    return _read_file('modules/modules-clamms.nf')
+    return _read_file('modules/callers/modules-clamms.nf')
 
 
 @pytest.fixture(scope='module')
 def xhmm_text():
-    return _read_file('modules/modules-xhmm.nf')
+    return _read_file('modules/callers/modules-xhmm.nf')
 
 
 @pytest.fixture(scope='module')
 def indelible_text():
-    return _read_file('modules/modules-indelible.nf')
+    return _read_file('modules/callers/modules-indelible.nf')
 
 
 @pytest.fixture(scope='module')
 def gatk_text():
-    return _read_file('modules/modules-gatk-gcnv.nf')
+    return _read_file('modules/callers/modules-gatk-gcnv.nf')
 
 
 @pytest.fixture(scope='module')
 def cnvkit_text():
-    return _read_file('modules/modules-cnvkit.nf')
+    return _read_file('modules/callers/modules-cnvkit.nf')
 
 
 @pytest.fixture(scope='module')
 def dragen_text():
-    return _read_file('modules/modules-icav2-dragen.nf')
+    return _read_file('modules/callers/modules-icav2-dragen.nf')
 
 
 @pytest.fixture(scope='module')
@@ -369,7 +369,7 @@ class TestNormaliseProcessOutputs:
 
     @pytest.fixture(scope='class')
     def common_text(self):
-        return _read_file('modules/modules-common.nf')
+        return _read_file('modules/common/modules-common.nf')
 
     def _check_outputs(self, module_text, caller_name, common_text):
         body = _extract_process(module_text, 'NORMALISE_CNV_QUALITY_SCORES')

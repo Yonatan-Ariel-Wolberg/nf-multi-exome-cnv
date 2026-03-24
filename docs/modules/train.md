@@ -36,7 +36,7 @@ When `probes_bed` is provided, any still-unmatched rows are then matched by shar
 capture probes on the same `sample_id`, `chrom`, and `cnv_type`.
 
 ## Params template
-- `params/params-train.json`
+- `params/general/params-train.json`
 
 ## Outputs
 - `cnv_model.json` – trained XGBoost model.

@@ -1,0 +1,23 @@
+{
+    "workflow": "full",
+    "outdir": "./results",
+    "merger_mode": "survivor",
+    "samplesheet_bams": "/path/to/samplesheet.tsv",
+    "fai": "/path/to/reference.fasta.fai",
+    "bams": "/path/to/bams/**/*.bam",
+    "fasta": "/path/to/reference.fasta",
+    "targets": "/path/to/targets.bed",
+    "refflat": "/path/to/refFlat.txt",
+    "samples_path": "/path/to/bams/**/*.bam",
+    "dict": "/path/to/reference.dict",
+    "exome_targets": "/path/to/exome_targets.interval_list",
+    "cramFilePairsUploadPath": "/path/to/crams/**/*.{cram,cram.crai}",
+    "crams": "/path/to/indelible/crams",
+    "bam_file": "/path/to/sample.bam",
+    "reference_fasta": "/path/to/reference.fasta",
+    "bed_file": "/path/to/targets.bed",
+    "mappability_file": "/path/to/mappability.bed",
+    "indelible_counts": "/path/to/indelible_counts.tsv",
+    "truth_labels": "/path/to/truth_labels.tsv",
+    "probes_bed": "/path/to/probes.bed"
+}

@@ -1,4 +1,4 @@
-# Common VCF post-processing module (`modules/modules-common.nf`)
+# Common VCF post-processing module (`modules/common/modules-common.nf`)
 
 ## Methodology
 Most caller modules run two shared post-processing steps: VCF standardisation (sort/compress/index and tool annotation) and quality-score normalisation.

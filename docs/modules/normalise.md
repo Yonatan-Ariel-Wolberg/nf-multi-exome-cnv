@@ -13,4 +13,4 @@ Standalone quality normalisation for pre-existing caller VCF files. This enables
 - `caller` (`CANOES`, `CLAMMS`, `XHMM`, `GCNV`, `CNVKIT`, `DRAGEN`, or `INDELIBLE`)
 
 ## Params template
-- `params/params-normalise.json`
+- `params/general/params-normalise.json`

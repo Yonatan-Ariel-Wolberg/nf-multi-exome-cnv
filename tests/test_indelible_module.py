@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for the INDELIBLE Nextflow module (modules/modules-indelible.nf).
+Tests for the INDELIBLE Nextflow module (modules/callers/modules-indelible.nf).
 
 Validates the module against the reference implementations:
   * HurlesGroupSanger/indelible  (indelible.py subcommand CLI)
@@ -50,7 +50,7 @@ import re
 import os
 import pytest
 
-NF_MODULE = "modules/modules-indelible.nf"
+NF_MODULE = "modules/callers/modules-indelible.nf"
 
 # Repository root resolved once at import time
 _REPO_ROOT = os.path.join(os.path.dirname(__file__), "..")

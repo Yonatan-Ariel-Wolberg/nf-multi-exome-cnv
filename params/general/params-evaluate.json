@@ -1,0 +1,8 @@
+{
+    "workflow":   "evaluate",
+    "outdir":     "./results",
+    "vcf_dir":    "/path/to/caller_vcfs",
+    "caller":     "CANOES",
+    "truth_bed":  "/path/to/truthset.bed",
+    "probes_bed": "/path/to/probes.bed"
+}

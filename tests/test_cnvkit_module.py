@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for the CNVKit Nextflow module (modules/modules-cnvkit.nf).
+Tests for the CNVKit Nextflow module (modules/callers/modules-cnvkit.nf).
 
 Validates that the module correctly implements the CNVKit pipeline for exome
 sequencing data with a cohort-only sampleset (no matched normals), producing
@@ -27,7 +27,7 @@ import re
 import pytest
 
 
-NF_MODULE = "modules/modules-cnvkit.nf"
+NF_MODULE = "modules/callers/modules-cnvkit.nf"
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for modules/modules-normalise.nf and its integration into main.nf.
+Tests for modules/normalise/modules-normalise.nf and its integration into main.nf.
 
 Validates:
   1. The module file exists and has the correct DSL2 / process / workflow structure.
@@ -9,7 +9,7 @@ Validates:
      correct arguments, bgzips, and tabix-indexes the output.
   4. main.nf includes the NORMALISE module, defines RUN_NORMALISE, and has a
      case['normalise'] block that reads --vcf_dir and --caller params.
-  5. params/params-normalise.json exists and contains valid JSON with the
+  5. params/general/params-normalise.json exists and contains valid JSON with the
      correct "workflow" key.
 """
 
@@ -20,9 +20,9 @@ import re
 import pytest
 
 REPO_ROOT   = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-NF_PATH     = os.path.join(REPO_ROOT, 'modules', 'modules-normalise.nf')
+NF_PATH     = os.path.join(REPO_ROOT, 'modules', 'normalise', 'modules-normalise.nf')
 MAIN_NF     = os.path.join(REPO_ROOT, 'main.nf')
-PARAMS_FILE = os.path.join(REPO_ROOT, 'params', 'params-normalise.json')
+PARAMS_FILE = os.path.join(REPO_ROOT, 'params', 'general', 'params-normalise.json')
 
 # Valid caller names accepted by normalise_cnv_caller_quality_scores.py.
 # Note: GATK gCNV is 'GATK' (not 'GCNV') in the normalise script.
@@ -54,7 +54,7 @@ class TestModuleStructure:
 
     def test_file_exists(self):
         assert os.path.isfile(NF_PATH), (
-            'modules/modules-normalise.nf must exist'
+            'modules/normalise/modules-normalise.nf must exist'
         )
 
     def test_dsl2_enabled(self, nf_text):
@@ -247,15 +247,15 @@ class TestMainNfIntegration:
 
 
 # ===========================================================================
-# 6. params/params-normalise.json
+# 6. params/general/params-normalise.json
 # ===========================================================================
 
 class TestParamsFile:
-    """params/params-normalise.json must exist and be valid JSON."""
+    """params/general/params-normalise.json must exist and be valid JSON."""
 
     def test_params_file_exists(self):
         assert os.path.isfile(PARAMS_FILE), (
-            'params/params-normalise.json must exist'
+            'params/general/params-normalise.json must exist'
         )
 
     def test_params_file_valid_json(self):

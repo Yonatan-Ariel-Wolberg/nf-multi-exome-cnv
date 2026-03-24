@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for modules/modules-survivor.nf SURVIVOR merge parameters.
+Tests for modules/sv-mergers/modules-survivor.nf SURVIVOR merge parameters.
 
 Verifies that the module contains exactly two SURVIVOR merge calls:
   1. Union merge        (min_support=1) → *_survivor_union.vcf
@@ -18,7 +18,7 @@ import os
 import re
 
 MODULE_PATH = os.path.join(
-    os.path.dirname(__file__), '..', 'modules', 'modules-survivor.nf'
+    os.path.dirname(__file__), '..', 'modules', 'sv-mergers', 'modules-survivor.nf'
 )
 
 # ---------------------------------------------------------------------------

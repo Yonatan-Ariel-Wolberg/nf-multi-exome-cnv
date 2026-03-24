@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tests for the GATK-gCNV Nextflow module (modules/modules-gatk-gcnv.nf).
+Tests for the GATK-gCNV Nextflow module (modules/callers/modules-gatk-gcnv.nf).
 
 Validates that the module follows the GATK gCNV cohort-calling best practices
 for exome sequencing data:
@@ -23,7 +23,7 @@ import re
 import pytest
 
 
-NF_MODULE = "modules/modules-gatk-gcnv.nf"
+NF_MODULE = "modules/callers/modules-gatk-gcnv.nf"
 
 
 # ---------------------------------------------------------------------------
@@ -397,7 +397,7 @@ class TestNormaliseProcess:
             module_text,
         ), (
             "modules-gatk-gcnv.nf must include NORMALISE_CNV_QUALITY_SCORES "
-            "from ./modules-common.nf"
+            "from ../common/modules-common.nf"
         )
 
     def test_workflow_normalise_call_passes_caller_gatk(self, module_text):

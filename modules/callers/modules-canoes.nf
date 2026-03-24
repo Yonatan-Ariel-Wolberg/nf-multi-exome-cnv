@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-include { BGZIP_SORT_INDEX_VCF; NORMALISE_CNV_QUALITY_SCORES } from './modules-common.nf'
+include { BGZIP_SORT_INDEX_VCF; NORMALISE_CNV_QUALITY_SCORES } from '../common/modules-common.nf'
 
 // ================================================================================
 //  CANOES MODULE

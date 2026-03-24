@@ -53,4 +53,4 @@ with an error if a sample ID is not found.
 - `truth_bed`, `probes_bed` (only when running automatic evaluation in `main.nf`)
 
 ## Params template
-- `params/params-clamms.json`
+- `params/general/params-clamms.json`

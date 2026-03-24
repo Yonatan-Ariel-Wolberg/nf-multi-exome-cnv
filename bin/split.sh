@@ -1,3 +1,4 @@
+#!/bin/bash
 awk '
     {
         for( i = 4; i <= NF; i=i+10 )

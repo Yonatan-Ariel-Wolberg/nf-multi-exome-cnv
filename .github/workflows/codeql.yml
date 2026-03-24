@@ -103,6 +103,8 @@ jobs:
   analyze-scripts:
     name: Analyze scripts (Nextflow/R/Shell)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -110,9 +112,8 @@ jobs:
     - name: Analyze Shell scripts
       shell: bash
       run: |
-        shell_files="$(find . -type f -name '*.sh')"
-        if [[ -n "$shell_files" ]]; then
-          echo "$shell_files" | xargs shellcheck
+        if find . -type f -name '*.sh' -print -quit | grep -q .; then
+          find . -type f -name '*.sh' -print0 | xargs -0 shellcheck
         else
           echo "No shell scripts found."
         fi
@@ -123,11 +124,10 @@ jobs:
     - name: Analyze R scripts
       shell: bash
       run: |
-        r_files="$(find . -type f -name '*.R')"
-        if [[ -n "$r_files" ]]; then
-          while IFS= read -r file; do
-            Rscript -e "parse(file='${file}')"
-          done <<< "$r_files"
+        if find . -type f -name '*.R' -print -quit | grep -q .; then
+          while IFS= read -r -d '' file; do
+            Rscript -e "parse(file = commandArgs(trailingOnly = TRUE)[1])" "$file"
+          done < <(find . -type f -name '*.R' -print0)
         else
           echo "No R scripts found."
         fi
@@ -147,11 +147,10 @@ jobs:
     - name: Analyze Nextflow scripts
       shell: bash
       run: |
-        nf_files="$(find . -type f -name '*.nf')"
-        if [[ -n "$nf_files" ]]; then
-          while IFS= read -r file; do
-            groovy -e "new GroovyShell().parse(new File('${file}'))"
-          done <<< "$nf_files"
+        if find . -type f -name '*.nf' -print -quit | grep -q .; then
+          while IFS= read -r -d '' file; do
+            groovy -e "new GroovyShell().parse(new File(args[0]))" "$file"
+          done < <(find . -type f -name '*.nf' -print0)
         else
           echo "No Nextflow scripts found."
         fi

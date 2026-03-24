@@ -1,0 +1,6 @@
+{
+    "workflow":     "train",
+    "outdir":       "./results",
+    "features_dir": "./results/out_FEATURES",
+    "truth_labels": "./truth_labels.tsv"
+}

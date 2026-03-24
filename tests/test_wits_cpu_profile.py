@@ -772,3 +772,20 @@ class TestParamsDirectoryLayout:
             assert os.path.isdir(path), (
                 f"params/{dirname} must exist"
             )
+
+    def test_every_general_params_json_has_variants_in_all_target_subdirectories(self):
+        """Every params/general/params*.json file must exist in wits/ddd-africa/ddd-uk."""
+        params_root = os.path.join(REPO_ROOT, 'params')
+        general_dir = os.path.join(params_root, 'general')
+        general_files = sorted(
+            f for f in os.listdir(general_dir)
+            if f.startswith('params') and f.endswith('.json')
+        )
+        assert general_files, "params/general must contain params*.json templates"
+        for filename in general_files:
+            for target in ('wits', 'ddd-africa', 'ddd-uk'):
+                target_path = os.path.join(params_root, target, filename)
+                assert os.path.isfile(target_path), (
+                    f"params/{target}/{filename} must exist because "
+                    f"params/general/{filename} exists"
+                )

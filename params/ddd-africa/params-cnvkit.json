@@ -1,0 +1,10 @@
+{
+    "workflow": "cnvkit",
+    "outdir": "./results",
+    "bams": "/path/to/bams/**/*.bam",
+    "fasta": "/path/to/reference.fasta",
+    "targets": "/path/to/targets.bed",
+    "refflat": "/path/to/refFlat.txt",
+    "test_size": -1,
+    "test_list": "all"
+}

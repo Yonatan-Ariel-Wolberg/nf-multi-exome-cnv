@@ -1,0 +1,12 @@
+{
+    "workflow": "clamms",
+    "outdir": "./results",
+    "samplesheet_bams": "/path/to/samplesheet.tsv",
+    "ref": "/path/to/reference.fasta",
+    "fai": "/path/to/reference.fasta.fai",
+    "probes": "/path/to/probes.bed",
+    "interval_list": "/path/to/intervals.bed",
+    "mappability": "/path/to/mappability.bed",
+    "special_reg": "/path/to/special_regions.bed",
+    "sexinfo": "/path/to/sex_info.txt"
+}

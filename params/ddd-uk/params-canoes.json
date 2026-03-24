@@ -1,0 +1,9 @@
+{
+    "workflow": "canoes",
+    "outdir": "./results",
+    "samplesheet_bams": "/path/to/samplesheet.tsv",
+    "ref": "/path/to/reference.fasta",
+    "fai": "/path/to/reference.fasta.fai",
+    "probes": "/path/to/probes.bed",
+    "canoes_batch_size": 100
+}

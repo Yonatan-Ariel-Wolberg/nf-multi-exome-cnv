@@ -1,0 +1,19 @@
+{
+    "workflow": "truvari_with_features",
+    "outdir": "./results",
+    "canoes_dir": "./results/out_CANOES/vcfs",
+    "clamms_dir": "./results/out_CLAMMS/vcfs",
+    "xhmm_dir": "./results/out_XHMM",
+    "cnvkit_dir": "./results/out_CNVKIT/vcfs",
+    "gcnv_dir": "./results/out_GCNV/vcfs",
+    "dragen_dir": "./results/out_DRAGEN/vcfs",
+    "indelible_dir": "./results/out_INDELIBLE/vcfs",
+    "canoes_norm_dir": "./results/out_NORMALISE/CANOES",
+    "clamms_norm_dir": "./results/out_NORMALISE/CLAMMS",
+    "xhmm_norm_dir": "./results/out_NORMALISE/XHMM",
+    "cnvkit_norm_dir": "./results/out_NORMALISE/CNVKIT",
+    "gcnv_norm_dir": "./results/out_NORMALISE/GCNV",
+    "dragen_norm_dir": "./results/out_NORMALISE/DRAGEN",
+    "indelible_norm_dir": "./results/out_NORMALISE/INDELIBLE",
+    "merger_mode": "truvari"
+}

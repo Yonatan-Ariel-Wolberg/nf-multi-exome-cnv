@@ -4,7 +4,7 @@ A Nextflow pipeline for comprehensive genomic analysis combining multiple varian
 
 ## Tools
 
-
+| Tool | GitHub Repository/Tool Documentation | Journal Article |
 |---|---|---|
 | **CANOES** | [GitHub](https://github.com/ShenLab/CANOES) | [DOI](https://doi.org/10.1093/nar/gku345) |
 | **CLAMMS** | [GitHub](https://github.com/rgcgithub/clamms) | [DOI](https://doi.org/10.1093/bioinformatics/btv547) |

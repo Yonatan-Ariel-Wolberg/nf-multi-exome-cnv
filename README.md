@@ -11,9 +11,9 @@ A Nextflow pipeline for comprehensive genomic analysis combining multiple varian
 | **XHMM** | [GitHub](https://github.com/RRafiee/XHMM) | [DOI](https://doi.org/10.1002/0471142905.hg0723s81) |
 | **InDelible** | [GitHub](https://github.com/HurlesGroupSanger/indelible) | [DOI](https://doi.org/10.1016/j.ajhg.2021.09.010) |
 | **ICAv2** | [GitHub](https://github.com/umccr/illumination/tree/v2); [ICAv2 Commands](https://help.ica.illumina.com/command-line-interface/cli-indexcommands) | N/A |
-| **Illumina's DRAGEN Germline Enrichment** | [Description of DRAGEN Enrichment](https://www.illumina.com/products/by-type/informatics-products/basespace-sequence-hub/apps/dragen-enrichment.html) | [DOI](https://doi.org/10.1038/s41587-024-02382-1) |
+| **Illumina's DRAGEN Germline Enrichment** | [DRAGEN v4.4 CNV Calling Description](https://help.dragen.illumina.com/product-guide/dragen-v4.4/dragen-dna-pipeline/cnv-calling) | [DOI](https://doi.org/10.1038/s41587-024-02382-1) |
 | **The Broad Institute's GATK-gCNV** | [GitHub](https://github.com/broadinstitute/gatk) | [DOI](https://doi.org/10.1038/s41588-023-01449-0) |
-| **CNVkit** | [GitHub](https://github.com/etal/cnvkit) | [DOI](https://doi.org/10.1371/journal.pcbi.1004873) |
+| **CNVkit** | [GitHub](https://github.com/etal/cnvkit); [CNVkit Documentation](https://cnvkit.readthedocs.io/en/stable/) | [DOI](https://doi.org/10.1371/journal.pcbi.1004873) |
 | **Truvari** | [GitHub](https://github.com/ACEnglish/truvari) | [DOI](https://doi.org/10.1186/s13059-022-02840-6) |
 | **SURVIVOR** | [GitHub](https://github.com/fritzsedlazeck/SURVIVOR) | [DOI](https://doi.org/10.1038/ncomms14061) |
 

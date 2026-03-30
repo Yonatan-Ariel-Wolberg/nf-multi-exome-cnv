@@ -8,3 +8,8 @@ work/
 .nextflow/
 .nextflow.log*
 results/
+
+# Singularity Containers
+*.sif
+**/*.sif
+**/**/*.sif

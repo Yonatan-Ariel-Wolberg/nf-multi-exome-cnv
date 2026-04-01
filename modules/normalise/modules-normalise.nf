@@ -42,7 +42,7 @@ process NORMALISE_CNV_QUALITY_SCORES {
 
     script:
     // Strip .sorted.vcf.gz / .vcf.gz / .vcf to get a clean base name for output files
-    def base     = vcf.name.replaceAll(/\.(sorted\.)?vcf(\.gz)?$/i, '')
+    def base     = vcf.name.replaceAll(/(?i)\.(sorted\.)?vcf(\.gz)?$/, '')
     def norm_vcf = "${base}.normalised.vcf"
     def norm_gz  = "${norm_vcf}.gz"
     """

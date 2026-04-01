@@ -138,7 +138,24 @@ class TestApptainerScope:
 
 
 # ===========================================================================
-# 2. Singularity scope – NXF_SINGULARITY_CACHEDIR
+# 2. Default runtime selection
+# ===========================================================================
+
+class TestContainerRuntimeDefault:
+    """Apptainer should be the default container runtime."""
+
+    def test_singularity_disabled_by_default(self):
+        """Global singularity.enabled must be false so Apptainer is preferred."""
+        content = _read_config()
+        singularity_block = _extract_block(content, r'\bsingularity')
+        assert re.search(r'enabled\s*=\s*false', singularity_block), (
+            "singularity.enabled must be false by default so Apptainer is the "
+            "default container runtime"
+        )
+
+
+# ===========================================================================
+# 3. Singularity scope – NXF_SINGULARITY_CACHEDIR
 # ===========================================================================
 
 class TestSingularityCacheDir:

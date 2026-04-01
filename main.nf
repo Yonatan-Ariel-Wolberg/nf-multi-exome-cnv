@@ -471,10 +471,10 @@ def extract_sample_id_from_vcf(f) {
     // downstream ".sorted" / ".normalised" suffixes from intermediate filenames.
     return f.name
         .replaceAll(/_(CANOES|CLAMMS|XHMM|CNVKIT|GCNV|DRAGEN|INDELIBLE).*/, '')
-        .replaceAll(/\.cnv\.vcf(\.gz)?$/i, '')
-        .replaceAll(/\.vcf(\.gz)?$/i, '')
-        .replaceAll(/\.sorted$/i, '')
-        .replaceAll(/\.normalised$/i, '')
+        .replaceAll(/(?i)\.cnv\.vcf(\.gz)?$/, '')
+        .replaceAll(/(?i)\.vcf(\.gz)?$/, '')
+        .replaceAll(/(?i)\.sorted$/, '')
+        .replaceAll(/(?i)\.normalised$/, '')
 }
 
 def infer_caller_from_vcf(f) {
@@ -904,7 +904,7 @@ workflow {
             if (params.get('merger_mode', 'survivor') == 'truvari') {
                 Channel.fromPath(params.merged_vcf_dir + '/**/*_truvari_merged.vcf*')
                     .map { f ->
-                        def sample_id = f.name.replaceAll(/_truvari.*/, '').replaceAll(/\.vcf(\.gz)?$/i, '')
+                        def sample_id = f.name.replaceAll(/_truvari.*/, '').replaceAll(/(?i)\.vcf(\.gz)?$/, '')
                         def collapsed_f = file("${f.parent}/${sample_id}_truvari_collapsed.vcf")
                         def collapsed_vcf_f = collapsed_f.exists() ? collapsed_f : []
                         build_feature_inputs(sample_id, f, collapsed_vcf_f)
@@ -914,7 +914,7 @@ workflow {
             } else {
                 Channel.fromPath(params.merged_vcf_dir + '/**/*_survivor_union.vcf*')
                     .map { f ->
-                        def sample_id = f.name.replaceAll(/_survivor.*/, '').replaceAll(/\.vcf(\.gz)?$/i, '')
+                        def sample_id = f.name.replaceAll(/_survivor.*/, '').replaceAll(/(?i)\.vcf(\.gz)?$/, '')
                         build_feature_inputs(sample_id, f, [])
                     }
                     .ifEmpty { error "feature_extraction workflow (survivor mode): no merged VCF files found in '${params.merged_vcf_dir}'. Expected files matching *_survivor_union.vcf or *_survivor_union.vcf.gz." }

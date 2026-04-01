@@ -130,7 +130,7 @@ def validate_required_params(workflow_name) {
     if (workflow_name == 'normalise' && is_param_set('caller')) {
         def caller_val = params.caller.toString().trim().toUpperCase()
         if (!VALID_NORMALISE_CALLERS.contains(caller_val)) {
-            exit 1, "Error: --caller '${params.caller}' is not a supported caller for --workflow normalise. Valid values are: ${VALID_NORMALISE_CALLERS.collect { \"'${it}'\" }.join(', ')}"
+            exit 1, "Error: --caller '${params.caller}' is not a supported caller for --workflow normalise. Valid values are: ${VALID_NORMALISE_CALLERS.collect { "'${it}'" }.join(', ')}"
         }
     }
 

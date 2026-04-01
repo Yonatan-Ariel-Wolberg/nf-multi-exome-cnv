@@ -238,6 +238,20 @@ class TestRuntimeInputValidation:
         assert "Error: insufficient disk space" in main_text
         assert "Error: VCF schema incompatibility" in main_text
 
+    def test_normalise_caller_error_message_has_no_backslash_escaped_quotes(self, main_text):
+        """Regression: GString inside normalise caller validation must not use backslash-escaped
+        double quotes (invalid in Nextflow/Groovy GStrings, causes compile failure)."""
+        # The fixed form uses single quotes directly: collect { "'${it}'" }
+        assert """collect { "'${it}'" }""" in main_text, (
+            "normalise caller error message must use collect { \"'${it}'\" } "
+            "with single quotes (not backslash-escaped double quotes)"
+        )
+        # Ensure the invalid backslash-escaped form is absent
+        assert r'''collect { \"'${it}'\" }''' not in main_text, (
+            "normalise caller error message must not contain backslash-escaped double quotes "
+            "inside the GString collect block (causes Nextflow compile failure)"
+        )
+
 
 # ===========================================================================
 # 3. Sub-workflow definitions

@@ -17,7 +17,7 @@ Validates that nextflow.config is correctly configured for:
      Singularity/Apptainer cache paths for the cluster.
   4. No GPU-specific clusterOptions (e.g., --gres=gpu) appear in the default
      process block or the `wits` profile.  The cluster is tested CPU-only.
-  5. The `icav2-dragen` process label uses parameterised values for the container
+  5. The `icav2_dragen` process label uses parameterised values for the container
      path and ICA credentials directory instead of hardcoded user-specific paths.
 """
 
@@ -74,11 +74,11 @@ def _process_section(content):
 
 
 def _icav2_label_section(content):
-    """Return the text of the withLabel: 'icav2-dragen' { } block."""
+    """Return the text of the withLabel: 'icav2_dragen' { } block."""
     match = re.search(
-        r"withLabel:\s*'icav2-dragen'\s*\{([^}]+)\}", content, re.DOTALL
+        r"withLabel:\s*'icav2_dragen'\s*\{([^}]+)\}", content, re.DOTALL
     )
-    assert match, "withLabel: 'icav2-dragen' block not found"
+    assert match, "withLabel: 'icav2_dragen' block not found"
     return match.group(1)
 
 
@@ -349,35 +349,35 @@ class TestNoGpuInDefaultProcess:
 # ===========================================================================
 
 class TestIcav2DragenLabel:
-    """The icav2-dragen label must use params for user-specific paths."""
+    """The icav2_dragen label must use params for user-specific paths."""
 
     def test_no_hardcoded_home_ywolberg_in_icav2_label(self):
-        """icav2-dragen label must not hardcode /home/ywolberg."""
+        """icav2_dragen label must not hardcode /home/ywolberg."""
         content = _read_config()
         label = _icav2_label_section(content)
         assert '/home/ywolberg' not in label, (
-            "withLabel: 'icav2-dragen' must not hardcode '/home/ywolberg'. "
+            "withLabel: 'icav2_dragen' must not hardcode '/home/ywolberg'. "
             "Use params.icav2_creds_dir or System.getProperty('user.home') instead."
         )
 
     def test_icav2_container_uses_param(self):
-        """icav2-dragen container must reference a parameter, not a hardcoded path."""
+        """icav2_dragen container must reference a parameter, not a hardcoded path."""
         content = _read_config()
         label = _icav2_label_section(content)
         # The container line must reference params (not hardcode /home/ywolberg)
         container_line = [l for l in label.splitlines() if 'container' in l]
-        assert container_line, "icav2-dragen label must set container"
+        assert container_line, "icav2_dragen label must set container"
         assert 'params' in container_line[0] or 'icav2_container' in container_line[0], (
-            "icav2-dragen container must be set via params.icav2_container "
+            "icav2_dragen container must be set via params.icav2_container "
             "rather than a hardcoded /home/... path"
         )
 
     def test_icav2_creds_dir_uses_param_or_system(self):
-        """icav2-dragen runOptions must reference params or System for creds dir."""
+        """icav2_dragen runOptions must reference params or System for creds dir."""
         content = _read_config()
         label = _icav2_label_section(content)
         assert 'icav2_creds_dir' in label or "user.home" in label, (
-            "icav2-dragen runOptions must reference params.icav2_creds_dir or "
+            "icav2_dragen runOptions must reference params.icav2_creds_dir or "
             "System.getProperty('user.home') for the ICA credentials directory "
             "instead of hardcoding a user-specific path"
         )
@@ -475,15 +475,15 @@ class TestBindPaths:
         )
 
     def test_icav2_label_uses_bind_paths(self):
-        """icav2-dragen runOptions must also forward bind_paths."""
+        """icav2_dragen runOptions must also forward bind_paths."""
         content = _read_config()
         label = _icav2_label_section(content)
         run_options_line = next(
             (l for l in label.splitlines() if 'runOptions' in l), None
         )
-        assert run_options_line is not None, "icav2-dragen label must set runOptions"
+        assert run_options_line is not None, "icav2_dragen label must set runOptions"
         assert 'bind_paths' in run_options_line or 'bindMountFlags' in run_options_line, (
-            "icav2-dragen runOptions must forward params.bind_paths (or the "
+            "icav2_dragen runOptions must forward params.bind_paths (or the "
             "bindMountFlags helper) so that user data directories are accessible "
             "inside the DRAGEN container"
         )

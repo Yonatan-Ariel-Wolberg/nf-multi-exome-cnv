@@ -359,7 +359,7 @@ The DRAGEN workflow submits runs to the ICAv2 cloud platform from a local contai
    # or:
    apptainer build icav2_cli_v2.43.0.sif bin/icav2.def
    ```
-2. Update the container path in `nextflow.config` (`withLabel: 'icav2-dragen'`) to the location where you stored the `.sif` file.
+2. Update the container path in `nextflow.config` (`withLabel: 'icav2_dragen'`) to the location where you stored the `.sif` file.
 3. Ensure your ICA credentials are present at `~/.icav2/` on the cluster head node so they can be bind-mounted into the container.
 
 ## Scalability: running 50, 300, or 2000 samples

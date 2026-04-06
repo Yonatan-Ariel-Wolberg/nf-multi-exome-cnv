@@ -12,7 +12,7 @@ outdir = file(params.outdir, type: 'dir')
 process UPLOAD_CRAM_FILES {
     debug true
     tag "$sampleId"
-    label 'icav2-dragen'
+    label 'icav2_dragen'
     maxForks params.maxUploadForks
     cpus 1
     time '6h'
@@ -154,7 +154,7 @@ process UPLOAD_CRAM_FILES {
 process GET_STATIC_FILES {
     debug true
     tag "Validating Static Files"
-    label 'icav2-dragen'
+    label 'icav2_dragen'
     cpus 1
 
     input:
@@ -189,7 +189,7 @@ process GET_STATIC_FILES {
 process CHECK_FILE_STATUS {
     debug true
     tag "Checking Status"
-    label 'icav2-dragen'
+    label 'icav2_dragen'
     cpus 1
     errorStrategy 'retry'
     maxRetries 5
@@ -328,7 +328,7 @@ process CHECK_FILE_STATUS {
 process START_ANALYSIS_BATCH {
     debug true
     tag "Launch Batch Analysis"
-    label 'icav2-dragen'
+    label 'icav2_dragen'
     cpus 1
 
     input:
@@ -429,7 +429,7 @@ process START_ANALYSIS_BATCH {
 process CHECK_ANALYSIS_STATUS {
     debug true
     tag "Monitor Analysis"
-    label 'icav2-dragen'
+    label 'icav2_dragen'
     cpus 1
     errorStrategy 'retry'
     maxRetries 3
@@ -503,7 +503,7 @@ process CHECK_ANALYSIS_STATUS {
 process DOWNLOAD_ANALYSIS_OUTPUT {
     debug true
     tag "Download Output"
-    label 'icav2-dragen'
+    label 'icav2_dragen'
     cpus 1
 
     input:
@@ -548,7 +548,7 @@ process DOWNLOAD_ANALYSIS_OUTPUT {
 process DELETE_DATA {
     debug true
     tag "Cleanup"
-    label 'icav2-dragen'
+    label 'icav2_dragen'
     cpus 1
     errorStrategy 'ignore'
 

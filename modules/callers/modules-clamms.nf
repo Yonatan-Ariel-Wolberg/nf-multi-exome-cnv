@@ -18,12 +18,12 @@ params.special_reg   = ''
 params.sexinfo       = ''
 
 // Define file variables for inputs
-ref           = file(params.ref)
-probes        = file(params.probes)
-interval_list = file(params.interval_list)
-mappability   = file(params.mappability)
-special_reg   = file(params.special_reg)
-sexinfo       = file(params.sexinfo)
+ref           = file(params.ref           ?: 'NO_FILE')
+probes        = file(params.probes        ?: 'NO_FILE')
+interval_list = file(params.interval_list ?: 'NO_FILE')
+mappability   = file(params.mappability   ?: 'NO_FILE')
+special_reg   = file(params.special_reg   ?: 'NO_FILE')
+sexinfo       = file(params.sexinfo       ?: 'NO_FILE')
 outdir        = file(params.outdir)
 
 // =====================================================================================

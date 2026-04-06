@@ -11,9 +11,9 @@ include { NORMALISE_CNV_QUALITY_SCORES } from '../common/modules-common.nf'
 params.ref            = ''
 params.priors         = ''
 params.indelible_conf = ''
-ref               = file(params.ref, type: 'file')
-priors            = file(params.priors, type: 'file')
-indelible_conf    = file(params.indelible_conf, type: 'file')
+ref               = file(params.ref            ?: 'NO_FILE', type: 'file')
+priors            = file(params.priors         ?: 'NO_FILE', type: 'file')
+indelible_conf    = file(params.indelible_conf ?: 'NO_FILE', type: 'file')
 outdir            = file(params.outdir, type: 'dir')
 
 // 1. THE FETCH COMMAND EXTRACTS THE READS FROM THE BAM FILE, IT TAKES 2 ARGUMENTS:

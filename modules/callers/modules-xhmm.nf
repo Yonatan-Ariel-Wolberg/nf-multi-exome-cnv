@@ -14,9 +14,9 @@ params.ref        = ''
 params.probes     = ''
 params.xhmm_conf  = ''
 params.xhmm_batch_size = 50  // BAMs per GATK DepthOfCoverage job; increase for fewer but larger jobs
-ref       = file(params.ref, type: 'file')
-probes    = file(params.probes, type: 'file')
-xhmm_conf = file(params.xhmm_conf, type: 'file')
+ref       = file(params.ref       ?: 'NO_FILE', type: 'file')
+probes    = file(params.probes    ?: 'NO_FILE', type: 'file')
+xhmm_conf = file(params.xhmm_conf ?: 'NO_FILE', type: 'file')
 outdir    = file(params.outdir, type: 'dir')
 
 // =====================================================================================

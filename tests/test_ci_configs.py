@@ -35,6 +35,17 @@ def test_codeql_workflow_includes_expected_languages():
     assert text.count("build-mode: none") >= 3
 
 
+def test_tests_workflow_checks_nextflow_syntax():
+    text = TESTS_WORKFLOW.read_text(encoding="utf-8")
+    assert "nextflow" in text.lower(), (
+        "tests.yml must install and run Nextflow to validate .nf file syntax"
+    )
+    assert "main.nf" in text, (
+        "tests.yml must run 'nextflow run main.nf' (e.g. with --help) "
+        "to catch Nextflow/Groovy syntax errors in workflow files"
+    )
+
+
 def test_circleci_config_runs_python_tests():
     text = CIRCLECI_CONFIG.read_text(encoding="utf-8")
     assert "test:" in text

@@ -12,8 +12,8 @@ params.ref               = ''
 params.probes            = ''
 params.canoes_batch_size = 100  // BAMs per bedtools multicov job; reduce if hitting memory limits
 
-ref    = file(params.ref, type: 'file')
-probes = file(params.probes, type: 'file')
+ref    = file(params.ref    ?: 'NO_FILE', type: 'file')
+probes = file(params.probes ?: 'NO_FILE', type: 'file')
 outdir = file(params.outdir, type: 'dir')
 
 // Define the list of chromosomes to process

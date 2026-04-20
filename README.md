@@ -323,9 +323,11 @@ sbatch sbatch/run-calling-workflows-ddd-uk-all.sbatch
 
 Notes:
 
-- The 5/10 scripts create temporary subset inputs under `/tmp` and override params at runtime.
+- The 5/10 scripts create temporary subset inputs under `${SLURM_TMPDIR}` (or `${TMPDIR}`, else `/tmp`) and override params at runtime.
 - The `all` scripts use the full region-specific params files directly.
 - Outputs are written under `results/sbatch/<dataset>/<scope>/<workflow>/`.
+- Dataset paths default to `${DDD_DATA_HOME:-/home/$USER/DECIPHERING_DD_DATA}` and can be overridden via environment variables before `sbatch`, e.g. `DDD_AFRICA_SAMPLE_SHEET`, `DDD_AFRICA_BAM_ROOT`, `DDD_AFRICA_INDELIBLE_ROOT`, `DDD_AFRICA_DRAGEN_ROOT`, `DDD_UK_SAMPLE_SHEET`, `DDD_UK_BAM_ROOT`, `DDD_UK_INDELIBLE_ROOT`, `DDD_UK_DRAGEN_ROOT`.
+- If your subset samplesheet includes a header row, set `SAMPLESHEET_HAS_HEADER=true` (default is `auto` detection; set `false` for guaranteed headerless files).
 
 ### Cluster-specific bind mounts
 

@@ -12,20 +12,22 @@ SCOPE="$2"
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_DIR"
 
+DDD_DATA_HOME="${DDD_DATA_HOME:-/home/${USER}/DECIPHERING_DD_DATA}"
+
 case "$DATASET" in
   ddd-africa)
     PARAM_DIR="params/ddd-africa"
-    SAMPLE_SHEET="/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/samplesheet_africa.tsv"
-    BAM_ROOT="/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data"
-    INDELIBLE_ROOT="/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data"
-    DRAGEN_ROOT="/home/ywolberg/DECIPHERING_DD_DATA/DDD_AFRICA_DATA/batch_3/organized_data/Proband"
+    SAMPLE_SHEET="${DDD_AFRICA_SAMPLE_SHEET:-${DDD_DATA_HOME}/DDD_AFRICA_DATA/samplesheet_africa.tsv}"
+    BAM_ROOT="${DDD_AFRICA_BAM_ROOT:-${DDD_DATA_HOME}/DDD_AFRICA_DATA/batch_3/organized_data}"
+    INDELIBLE_ROOT="${DDD_AFRICA_INDELIBLE_ROOT:-${DDD_DATA_HOME}/DDD_AFRICA_DATA/batch_3/organized_data}"
+    DRAGEN_ROOT="${DDD_AFRICA_DRAGEN_ROOT:-${DDD_DATA_HOME}/DDD_AFRICA_DATA/batch_3/organized_data/Proband}"
     ;;
   ddd-uk)
     PARAM_DIR="params/ddd-uk"
-    SAMPLE_SHEET="/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/samplesheet_uk.tsv"
-    BAM_ROOT="/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/bams"
-    INDELIBLE_ROOT="/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams"
-    DRAGEN_ROOT="/home/ywolberg/DECIPHERING_DD_DATA/DDD_UK_DATA/crams"
+    SAMPLE_SHEET="${DDD_UK_SAMPLE_SHEET:-${DDD_DATA_HOME}/DDD_UK_DATA/samplesheet_uk.tsv}"
+    BAM_ROOT="${DDD_UK_BAM_ROOT:-${DDD_DATA_HOME}/DDD_UK_DATA/bams}"
+    INDELIBLE_ROOT="${DDD_UK_INDELIBLE_ROOT:-${DDD_DATA_HOME}/DDD_UK_DATA/crams}"
+    DRAGEN_ROOT="${DDD_UK_DRAGEN_ROOT:-${DDD_DATA_HOME}/DDD_UK_DATA/crams}"
     ;;
   *)
     echo "Unsupported dataset: $DATASET (expected ddd-africa or ddd-uk)" >&2
@@ -50,8 +52,13 @@ case "$SCOPE" in
     ;;
 esac
 
+# For subset samplesheets, set SAMPLESHEET_HAS_HEADER=true/false to force behavior.
+# Default "auto" detects a header when the first row contains both "sample" and "bam".
+SAMPLESHEET_HAS_HEADER="${SAMPLESHEET_HAS_HEADER:-auto}"
+
 RUN_ROOT="$REPO_DIR/results/sbatch/${DATASET}/${SCOPE_LABEL}"
-TMP_ROOT="/tmp/nf-multicaller-exomecnv/${DATASET}/${SCOPE_LABEL}/${SLURM_JOB_ID:-manual}"
+TMP_BASE="${SLURM_TMPDIR:-${TMPDIR:-/tmp}}"
+TMP_ROOT="${TMP_BASE}/nf-multicaller-exomecnv/${DATASET}/${SCOPE_LABEL}/${SLURM_JOB_ID:-manual}"
 mkdir -p "$RUN_ROOT" "$TMP_ROOT"
 
 if command -v module >/dev/null 2>&1; then
@@ -64,7 +71,7 @@ run_nextflow() {
   local params_file="$2"
   shift 2
 
-  echo "\n=== Running workflow: ${workflow} (${DATASET}, ${SCOPE_LABEL}) ==="
+  printf '\n=== Running workflow: %s (%s, %s) ===\n' "$workflow" "$DATASET" "$SCOPE_LABEL"
   nextflow run main.nf \
     -profile "wits,${COHORT_PROFILE}" \
     --workflow "$workflow" \
@@ -76,7 +83,27 @@ run_nextflow() {
 
 make_subset_samplesheet() {
   local destination="$1"
-  head -n "$SAMPLE_LIMIT" "$SAMPLE_SHEET" > "$destination"
+  local first_line
+  local has_header=0
+  case "$SAMPLESHEET_HAS_HEADER" in
+    true|TRUE|1)
+      has_header=1
+      ;;
+    false|FALSE|0)
+      has_header=0
+      ;;
+    auto|AUTO)
+      first_line="$(head -n 1 "$SAMPLE_SHEET" || true)"
+      if [[ "$first_line" =~ [Ss]ample ]] && [[ "$first_line" =~ [Bb][Aa][Mm] ]]; then
+        has_header=1
+      fi
+      ;;
+    *)
+      echo "Invalid SAMPLESHEET_HAS_HEADER value: $SAMPLESHEET_HAS_HEADER (use auto, true, or false)" >&2
+      exit 1
+      ;;
+  esac
+  head -n "$((SAMPLE_LIMIT + has_header))" "$SAMPLE_SHEET" > "$destination"
   if [[ ! -s "$destination" ]]; then
     echo "Subset samplesheet is empty: $destination" >&2
     exit 1
@@ -203,4 +230,4 @@ else
   run_nextflow dragen    "$PARAM_DIR/params-icav2-dragen-wits-${DATASET}.json"
 fi
 
-echo "\nCompleted all caller workflows for ${DATASET} (${SCOPE_LABEL}). Results: ${RUN_ROOT}"
+printf '\nCompleted all caller workflows for %s (%s). Results: %s\n' "$DATASET" "$SCOPE_LABEL" "$RUN_ROOT"

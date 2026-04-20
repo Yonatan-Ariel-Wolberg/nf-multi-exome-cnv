@@ -163,6 +163,23 @@ class TestWorkflowSwitchCases:
 class TestRequiredParamsValidation:
     """Required-parameter validation should list missing params per workflow."""
 
+    def test_global_required_params_map_is_script_field(self, main_text):
+        assert "import groovy.transform.Field" in main_text
+        assert "@Field def REQUIRED_PARAMS_BY_WORKFLOW = [" in main_text
+
+    def test_global_constants_used_by_runtime_validation_are_script_fields(self, main_text):
+        for field_name in [
+            "CALLER_DIR_PARAMS",
+            "VALID_NORMALISE_CALLERS",
+            "BYTES_PER_GIB",
+            "DEFAULT_MIN_FREE_GB",
+            "MAX_VCF_SCHEMA_VALIDATION_FILES",
+        ]:
+            assert f"@Field def {field_name}" in main_text
+
+    def test_test_size_has_safe_default_initialization(self, main_text):
+        assert "params.test_size = params.get('test_size', -1)" in main_text
+
     def test_required_params_map_includes_core_workflows(self, main_text):
         assert "def REQUIRED_PARAMS_BY_WORKFLOW" in main_text
         assert "def REQUIRED_PARAMS_BY_WORKFLOW = [" in main_text

@@ -1,5 +1,6 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
+import groovy.transform.Field
 
 // =====================================================================================
 // MODULE INCLUDES
@@ -22,8 +23,9 @@ include { EVALUATE } from './modules/evaluate/modules-evaluate.nf'
 // GLOBAL SETUP
 // =====================================================================================
 workflow_mode = params.workflow
+params.test_size = params.get('test_size', -1)
 
-def CALLER_DIR_PARAMS = [
+@Field def CALLER_DIR_PARAMS = [
     'canoes_dir',
     'clamms_dir',
     'xhmm_dir',
@@ -35,12 +37,12 @@ def CALLER_DIR_PARAMS = [
 
 // Valid caller names accepted by normalise_cnv_caller_quality_scores.py.
 // Note: GATK gCNV is referred to as 'GATK' (not 'GCNV') by the normalise script.
-def VALID_NORMALISE_CALLERS = ['CANOES', 'CLAMMS', 'XHMM', 'GATK', 'CNVKIT', 'DRAGEN', 'INDELIBLE']
-def BYTES_PER_GIB = 1024D * 1024D * 1024D
-def DEFAULT_MIN_FREE_GB = 5
-def MAX_VCF_SCHEMA_VALIDATION_FILES = 5
+@Field def VALID_NORMALISE_CALLERS = ['CANOES', 'CLAMMS', 'XHMM', 'GATK', 'CNVKIT', 'DRAGEN', 'INDELIBLE']
+@Field def BYTES_PER_GIB = 1024D * 1024D * 1024D
+@Field def DEFAULT_MIN_FREE_GB = 5
+@Field def MAX_VCF_SCHEMA_VALIDATION_FILES = 5
 
-def REQUIRED_PARAMS_BY_WORKFLOW = [
+@Field def REQUIRED_PARAMS_BY_WORKFLOW = [
     // Required params are aligned to the workflow-specific params/*.json templates.
     'indelible': ['outdir', 'crams', 'ref', 'priors', 'indelible_conf', 'fai'],
     'canoes': ['outdir', 'samplesheet_bams', 'ref', 'fai', 'probes', 'canoes_batch_size'],

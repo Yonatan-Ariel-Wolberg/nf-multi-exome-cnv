@@ -298,6 +298,35 @@ nextflow run main.nf \
 | `executor.queueSize` | 500 |
 | `executor.submitRateLimit` | 10/sec |
 
+### Prebuilt sbatch launchers for DDD-AFRICA / DDD-UK callers
+
+The repository includes SLURM launchers for running all individual caller workflows
+(`canoes`, `xhmm`, `clamms`, `cnvkit`, `gcnv`, `indelible`, `dragen`) on:
+
+- 5 samples
+- 10 samples
+- all available samples
+
+for each region-specific dataset (`ddd-africa`, `ddd-uk`):
+
+```bash
+# DDD-AFRICA
+sbatch sbatch/run-calling-workflows-ddd-africa-5.sbatch
+sbatch sbatch/run-calling-workflows-ddd-africa-10.sbatch
+sbatch sbatch/run-calling-workflows-ddd-africa-all.sbatch
+
+# DDD-UK
+sbatch sbatch/run-calling-workflows-ddd-uk-5.sbatch
+sbatch sbatch/run-calling-workflows-ddd-uk-10.sbatch
+sbatch sbatch/run-calling-workflows-ddd-uk-all.sbatch
+```
+
+Notes:
+
+- The 5/10 scripts create temporary subset inputs under `/tmp` and override params at runtime.
+- The `all` scripts use the full region-specific params files directly.
+- Outputs are written under `results/sbatch/<dataset>/<scope>/<workflow>/`.
+
 ### Cluster-specific bind mounts
 
 The global `singularity.runOptions` in `nextflow.config` binds the paths listed

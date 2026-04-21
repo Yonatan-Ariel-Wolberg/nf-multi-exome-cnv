@@ -255,3 +255,13 @@ class TestPooledReferenceApproach:
             "CNVKIT workflow must use .collect() to gather all sample coverages "
             "before passing them to CREATE_POOLED_REFERENCE."
         )
+
+
+class TestParamHandling:
+    """CNVKIT module should not declare top-level params blocks."""
+
+    def test_module_does_not_declare_params_block(self, module_text):
+        assert "params {" not in module_text, (
+            "modules-cnvkit.nf must not declare a module-level params block; "
+            "parameter defaults should live in top-level pipeline entry/config."
+        )

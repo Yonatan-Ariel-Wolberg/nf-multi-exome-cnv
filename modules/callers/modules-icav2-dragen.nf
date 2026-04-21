@@ -21,7 +21,7 @@ process UPLOAD_CRAM_FILES {
     maxRetries params.uploadRetries
 
     input:
-    tuple val(sampleId), file(cramPair)
+    tuple val(sampleId), path(cramPair)
 
     output:
     path "data_upload.txt", emit: dataFile

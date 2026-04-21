@@ -24,7 +24,7 @@ interval_list = file(params.interval_list ?: 'NO_FILE')
 mappability   = file(params.mappability   ?: 'NO_FILE')
 special_reg   = file(params.special_reg   ?: 'NO_FILE')
 sexinfo       = file(params.sexinfo       ?: 'NO_FILE')
-outdir        = file(params.outdir)
+outdir        = file(params.outdir, type: 'dir')
 
 // =====================================================================================
 // PROCESSES FOR CLAMMS

@@ -103,6 +103,28 @@ class TestNextflowConfigGlobalDefaults:
             f"Global xhmm_batch_size should be 50 (medium default), got {value}"
         )
 
+    def test_global_help_default_is_false(self):
+        """Global params block should declare help = false."""
+        content = self._load_config()
+        global_section = content.split('profiles {')[0]
+        match = re.search(r'help\s*=\s*(\S+)', global_section)
+        assert match is not None, \
+            "help not found in the global params block of nextflow.config"
+        assert match.group(1) == 'false', (
+            f"Global help should be false by default, got {match.group(1)}"
+        )
+
+    def test_global_test_size_default_is_minus_one(self):
+        """Global params block should declare test_size = -1."""
+        content = self._load_config()
+        global_section = content.split('profiles {')[0]
+        match = re.search(r'test_size\s*=\s*(-?\d+)', global_section)
+        assert match is not None, \
+            "test_size not found in the global params block of nextflow.config"
+        assert int(match.group(1)) == -1, (
+            f"Global test_size should be -1 by default, got {match.group(1)}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # nextflow.config cohort-size profile values

@@ -3,16 +3,6 @@ nextflow.enable.dsl=2
 
 include { NORMALISE_CNV_QUALITY_SCORES } from '../common/modules-common.nf'
 
-// =====================================================================================
-// GLOBAL FILE INSTANTIATION
-// =====================================================================================
-params {
-    bin_length = 0     // 0 = no binning for exome (each target interval is its own bin); use >0 for WGS
-    padding = 250      // 250 bp padding per GATK gCNV exome best practice
-    scatter_count = 5000 // SCATTER_CONTENT: max intervals per shard (used with INTERVAL_COUNT mode)
-    is_wgs = false // Set to false indicating the analysis is exome sequencing
-}
-
 // Define output directory
 outdir = file(params.outdir, type: 'dir')
 

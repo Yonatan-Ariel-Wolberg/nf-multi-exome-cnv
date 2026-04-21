@@ -32,12 +32,13 @@ jobs:
           curl -s https://get.nextflow.io | bash
           sudo mv nextflow /usr/local/bin/
 
-      - name: Check Nextflow stub-run validation path
+      - name: Check Nextflow syntax
         env:
           NXF_DOCKER_ENABLED: 'false'
           NXF_SINGULARITY_ENABLED: 'false'
           NXF_APPTAINER_ENABLED: 'false'
-        run: nextflow run main.nf --workflow normalise --outdir ./ci_out --vcf_dir ./tests/data/minimal_vcf_dir --caller CANOES -stub-run
+        run: |
+          nextflow run main.nf --workflow normalise --outdir ./ci_out --vcf_dir ./tests/data/minimal_vcf_dir --caller CANOES -stub-run
 
       - name: Check bash scripts
         run: |

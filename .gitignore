@@ -13,3 +13,7 @@ results/
 *.sif
 **/*.sif
 **/**/*.sif
+
+
+#Ignore insiders AI rules
+.github/instructions/codacy.instructions.md

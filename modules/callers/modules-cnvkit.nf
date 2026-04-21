@@ -3,13 +3,6 @@ nextflow.enable.dsl=2
 
 include { BGZIP_SORT_INDEX_VCF; NORMALISE_CNV_QUALITY_SCORES } from '../common/modules-common.nf'
 
-// =====================================================================================
-// GLOBAL PARAMETERS
-// =====================================================================================
-params {
-    test_size = -1 // Specify the test size for performance tuning
-}
-
 // Define output directory
 outdir = file(params.outdir, type: 'dir')
 

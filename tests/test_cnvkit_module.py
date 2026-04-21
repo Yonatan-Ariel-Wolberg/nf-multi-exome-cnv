@@ -60,6 +60,16 @@ def module_text():
     return _read_module(repo_root)
 
 
+class TestParamDeclarationStrategy:
+    """CNVkit module should consume globally-declared params."""
+
+    def test_module_has_no_strict_params_block(self, module_text):
+        assert "params {" not in module_text, (
+            "modules-cnvkit.nf should not define a strict module-level params block; "
+            "pipeline-facing params are centralized globally."
+        )
+
+
 @pytest.fixture(scope="module")
 def call_cnv_body(module_text):
     body = _extract_process(module_text, "CALL_CNV")

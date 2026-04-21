@@ -4,7 +4,8 @@ Tests for the GATK-gCNV Nextflow module (modules/callers/modules-gatk-gcnv.nf).
 
 Validates that the module follows the GATK gCNV cohort-calling best practices
 for exome sequencing data:
-  1. Exome-appropriate default parameters (bin_length=0, padding=250).
+  1. Exome-appropriate default parameters are centrally declared in nextflow.config
+     (bin_length=0, padding=250, scatter_count=5000, is_wgs=false).
   2. DetermineGermlineContigPloidy uses --run-mode COHORT.
   3. GermlineCNVCaller uses per-shard unique output prefixes derived from the
      shard directory name (not the static "shard" prefix that caused staging
@@ -19,11 +20,13 @@ for exome sequencing data:
      sample index channel so that sample indices are deterministically assigned.
 """
 
+import os
 import re
 import pytest
 
 
 NF_MODULE = "modules/callers/modules-gatk-gcnv.nf"
+NEXTFLOW_CONFIG = "nextflow.config"
 
 
 # ---------------------------------------------------------------------------
@@ -36,15 +39,37 @@ def _read_module(repo_root="."):
         return fh.read()
 
 
+def _read_config(repo_root="."):
+    path = f"{repo_root}/{NEXTFLOW_CONFIG}"
+    with open(path) as fh:
+        return fh.read()
+
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
 def module_text():
-    import os
     repo_root = os.path.join(os.path.dirname(__file__), "..")
     return _read_module(repo_root)
+
+
+@pytest.fixture(scope="module")
+def global_config_text():
+    repo_root = os.path.join(os.path.dirname(__file__), "..")
+    content = _read_config(repo_root)
+    return content.split("profiles {")[0]
+
+
+class TestParamDeclarationStrategy:
+    """GATK-gCNV module should consume globally-declared params."""
+
+    def test_module_has_no_strict_params_block(self, module_text):
+        assert "params {" not in module_text, (
+            "modules-gatk-gcnv.nf should not define a strict module-level params block; "
+            "pipeline-facing params are centralized globally."
+        )
 
 
 # ===========================================================================
@@ -52,36 +77,36 @@ def module_text():
 # ===========================================================================
 
 class TestDefaultParams:
-    """The module-level params block must reflect exome best-practice defaults."""
+    """Global params defaults must reflect exome best-practice defaults."""
 
-    def test_bin_length_is_zero(self, module_text):
+    def test_bin_length_is_zero(self, global_config_text):
         """bin_length must be 0 for exome (no binning; each target is its own interval)."""
-        match = re.search(r"bin_length\s*=\s*(\d+)", module_text)
-        assert match, "bin_length parameter not found in module"
+        match = re.search(r"bin_length\s*=\s*(\d+)", global_config_text)
+        assert match, "bin_length parameter not found in global params block"
         assert match.group(1) == "0", (
             f"bin_length should be 0 for exome data, got {match.group(1)}"
         )
 
-    def test_padding_is_250(self, module_text):
+    def test_padding_is_250(self, global_config_text):
         """padding must be 250 bp per GATK gCNV exome best practice."""
-        match = re.search(r"padding\s*=\s*(\d+)", module_text)
-        assert match, "padding parameter not found in module"
+        match = re.search(r"padding\s*=\s*(\d+)", global_config_text)
+        assert match, "padding parameter not found in global params block"
         assert match.group(1) == "250", (
             f"padding should be 250 for exome data, got {match.group(1)}"
         )
 
-    def test_scatter_count_is_5000(self, module_text):
+    def test_scatter_count_is_5000(self, global_config_text):
         """scatter_count (SCATTER_CONTENT) must match the JSON params default of 5000."""
-        match = re.search(r"scatter_count\s*=\s*(\d+)", module_text)
-        assert match, "scatter_count parameter not found in module"
+        match = re.search(r"scatter_count\s*=\s*(\d+)", global_config_text)
+        assert match, "scatter_count parameter not found in global params block"
         assert match.group(1) == "5000", (
             f"scatter_count should be 5000 (intervals per shard), got {match.group(1)}"
         )
 
-    def test_is_wgs_is_false(self, module_text):
+    def test_is_wgs_is_false(self, global_config_text):
         """is_wgs must be false (exome, not WGS)."""
-        match = re.search(r"is_wgs\s*=\s*(\S+)", module_text)
-        assert match, "is_wgs parameter not found in module"
+        match = re.search(r"is_wgs\s*=\s*(\S+)", global_config_text)
+        assert match, "is_wgs parameter not found in global params block"
         assert match.group(1) == "false", (
             f"is_wgs should be false for exome data, got {match.group(1)}"
         )
